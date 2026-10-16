@@ -5,19 +5,56 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Student Life Planner</title>
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; }
-        .task-box { border: 1px solid #ccc; padding: 20px; width: 300px; margin: 0 auto; border-radius: 10px; }
+        body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; background-color: #f4f4f9; }
+        .task-box { background: white; border: 1px solid #ccc; padding: 20px; width: 350px; margin: 0 auto; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        input { padding: 8px; width: 70%; margin-bottom: 10px; }
+        button { padding: 8px 15px; background-color: #28a745; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        button:hover { background-color: #218838; }
+        ul { text-align: left; padding-left: 20px; }
+        li { margin-bottom: 5px; }
     </style>
 </head>
 <body>
     <h1>My Campus Task Planner</h1>
+    
     <div class="task-box">
+        <h3>Add a New Task</h3>
+        <!-- 输入框和按钮 -->
+        <input type="text" id="taskInput" placeholder="Enter your assignment...">
+        <button onclick="addTask()">Add</button>
+
         <h3>Task List</h3>
-        <ul id="taskList" style="text-align: left;">
+        <!-- 任务列表显示在这里 -->
+        <ul id="taskList">
             <li>Finish System Analysis Report</li>
-            <li>Study for OS Basics</li>
         </ul>
-        <button onclick="alert('Function coming soon!')">Add New Task</button>
     </div>
+
+    <!-- 这里的 JavaScript 就是网页的大脑 -->
+    <script>
+        function addTask() {
+            // 1. 获取你在输入框里打的字
+            let input = document.getElementById("taskInput").value;
+            
+            // 2. 如果输入框是空的，提醒一下，不要添加
+            if (input === "") {
+                alert("Please enter a task!");
+                return;
+            }
+
+            // 3. 找到那个任务列表 (ul)
+            let ul = document.getElementById("taskList");
+            
+            // 4. 创建一个新的列表项 (li)
+            let li = document.createElement("li");
+            li.appendChild(document.createTextNode(input));
+            
+            // 5. 把新的任务加到列表里
+            ul.appendChild(li);
+
+            // 6. 清空输入框，方便下次输入
+            document.getElementById("taskInput").value = "";
+        }
+    </script>
 </body>
 </html>
