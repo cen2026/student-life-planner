@@ -7,131 +7,218 @@
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f0f2f5;
+            background-color: #f4f6f9;
             display: flex;
             justify-content: center;
-            padding-top: 50px;
+            padding: 30px 15px;
             margin: 0;
         }
         .planner-card {
             background: #ffffff;
-            width: 380px;
+            width: 100%;
+            max-width: 480px;
             padding: 24px;
             border-radius: 12px;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            box-shadow: 0 4px 16px rgba(0,0,0,0.08);
         }
-        h2 { margin-top: 0; color: #333; text-align: center; }
-        .input-group {
+        h2 { margin-top: 0; color: #2c3e50; text-align: center; }
+        
+        .input-form {
             display: flex;
-            gap: 8px;
-            margin-bottom: 20px;
+            flex-direction: column;
+            gap: 10px;
+            margin-bottom: 24px;
         }
-        input[type="text"] {
-            flex: 1;
-            padding: 10px;
-            border: 1px solid #ddd;
+        .input-row {
+            display: flex;
+            gap: 10px;
+        }
+        input, select {
+            padding: 9px 12px;
+            border: 1px solid #dcdfe6;
             border-radius: 6px;
+            font-size: 14px;
             outline: none;
         }
-        input[type="text"]:focus { border-color: #007bff; }
+        input:focus, select:focus {
+            border-color: #3b82f6;
+        }
+        #taskInput { flex: 1; }
+        #subjectInput { flex: 1; }
+        #dateInput { flex: 1; }
+
         button.add-btn {
-            padding: 10px 16px;
-            background-color: #007bff;
+            padding: 10px;
+            background-color: #3b82f6;
             color: white;
             border: none;
             border-radius: 6px;
             cursor: pointer;
-            font-weight: bold;
+            font-weight: 600;
+            font-size: 14px;
         }
-        button.add-btn:hover { background-color: #0056b3; }
+        button.add-btn:hover { background-color: #2563eb; }
+
         ul { list-style: none; padding: 0; margin: 0; }
         li {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            background: #fafafa;
-            border: 1px solid #eee;
-            padding: 10px 12px;
-            border-radius: 6px;
-            margin-bottom: 8px;
+            background: #ffffff;
+            border: 1px solid #eaedf1;
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            transition: all 0.2s;
         }
-        .task-content {
+        li.overdue {
+            border-left: 4px solid #ef4444;
+            background: #fff5f5;
+        }
+        .task-left {
             display: flex;
-            align-items: center;
+            align-items: flex-start;
             gap: 10px;
-            cursor: pointer;
         }
-        .completed {
+        .task-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .task-title {
+            font-size: 15px;
+            color: #1f2937;
+            font-weight: 500;
+        }
+        .task-meta {
+            font-size: 12px;
+            color: #6b7280;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .tag {
+            background-color: #e0f2fe;
+            color: #0369a1;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+        .due-text.is-overdue {
+            color: #dc2626;
+            font-weight: 600;
+        }
+        .completed .task-title {
             text-decoration: line-through;
-            color: #888;
+            color: #9ca3af;
+        }
+        .completed .tag {
+            background-color: #f3f4f6;
+            color: #9ca3af;
         }
         .delete-btn {
-            background: #ff4d4f;
-            color: white;
+            background: transparent;
+            color: #9ca3af;
             border: none;
-            border-radius: 4px;
-            padding: 4px 8px;
+            font-size: 16px;
             cursor: pointer;
-            font-size: 12px;
+            padding: 4px 8px;
+            border-radius: 4px;
         }
-        .delete-btn:hover { background: #d9363e; }
+        .delete-btn:hover {
+            color: #ef4444;
+            background-color: #fee2e2;
+        }
     </style>
 </head>
 <body>
 
 <div class="planner-card">
-    <h2>Student Life Planner</h2>
+    <h2>Campus Task Planner</h2>
     
-    <div class="input-group">
-        <input type="text" id="taskInput" placeholder="Add an assignment or exam...">
-        <button class="add-btn" onclick="addTask()">Add</button>
+    <div class="input-form">
+        <input type="text" id="taskInput" placeholder="Assignment or Exam title...">
+        <div class="input-row">
+            <select id="subjectInput">
+                <option value="GENERAL">General</option>
+                <option value="OS">Operating Systems</option>
+                <option value="ELECTIVE">Elective Course</option>
+                <option value="OTHERS">Others</option>
+            </select>
+            <input type="date" id="dateInput">
+        </div>
+        <button class="add-btn" onclick="addTask()">Add Assignment</button>
     </div>
 
     <ul id="taskList"></ul>
 </div>
 
 <script>
-    // 页面加载完成后，立刻从本地存储提取数据渲染出来
     document.addEventListener("DOMContentLoaded", loadTasks);
 
     function getStoredTasks() {
-        let tasks = localStorage.getItem("planner_tasks");
+        let tasks = localStorage.getItem("planner_tasks_v2");
         return tasks ? JSON.parse(tasks) : [];
     }
 
     function saveTasks(tasks) {
-        localStorage.setItem("planner_tasks", JSON.stringify(tasks));
+        localStorage.setItem("planner_tasks_v2", JSON.stringify(tasks));
     }
 
     function renderTasks() {
         const list = document.getElementById("taskList");
         list.innerHTML = "";
         const tasks = getStoredTasks();
+        const todayStr = new Date().toISOString().split('T')[0];
 
         tasks.forEach((task, index) => {
             const li = document.createElement("li");
+            
+            const isOverdue = task.dueDate && task.dueDate < todayStr && !task.completed;
+            if (isOverdue) li.classList.add("overdue");
+            if (task.completed) li.classList.add("completed");
 
-            const contentDiv = document.createElement("div");
-            contentDiv.className = "task-content";
+            const leftDiv = document.createElement("div");
+            leftDiv.className = "task-left";
 
             const checkbox = document.createElement("input");
             checkbox.type = "checkbox";
             checkbox.checked = task.completed;
             checkbox.onchange = () => toggleTask(index);
 
-            const span = document.createElement("span");
-            span.textContent = task.text;
-            if (task.completed) span.className = "completed";
+            const infoDiv = document.createElement("div");
+            infoDiv.className = "task-info";
 
-            contentDiv.appendChild(checkbox);
-            contentDiv.appendChild(span);
+            const title = document.createElement("div");
+            title.className = "task-title";
+            title.textContent = task.text;
+
+            const meta = document.createElement("div");
+            meta.className = "task-meta";
+
+            const tag = document.createElement("span");
+            tag.className = "tag";
+            tag.textContent = task.subject;
+            meta.appendChild(tag);
+
+            if (task.dueDate) {
+                const due = document.createElement("span");
+                due.className = `due-text ${isOverdue ? 'is-overdue' : ''}`;
+                due.textContent = isOverdue ? `Overdue: ${task.dueDate}` : `Due: ${task.dueDate}`;
+                meta.appendChild(due);
+            }
+
+            infoDiv.appendChild(title);
+            infoDiv.appendChild(meta);
+            leftDiv.appendChild(checkbox);
+            leftDiv.appendChild(infoDiv);
 
             const delBtn = document.createElement("button");
             delBtn.className = "delete-btn";
-            delBtn.textContent = "Delete";
+            delBtn.innerHTML = "&times;";
             delBtn.onclick = () => deleteTask(index);
 
-            li.appendChild(contentDiv);
+            li.appendChild(leftDiv);
             li.appendChild(delBtn);
             list.appendChild(li);
         });
@@ -142,15 +229,32 @@
     }
 
     function addTask() {
-        const input = document.getElementById("taskInput");
-        const text = input.value.trim();
+        const taskInput = document.getElementById("taskInput");
+        const subjectInput = document.getElementById("subjectInput");
+        const dateInput = document.getElementById("dateInput");
+
+        const text = taskInput.value.trim();
         if (!text) return;
 
         const tasks = getStoredTasks();
-        tasks.push({ text: text, completed: false });
+        tasks.push({
+            text: text,
+            subject: subjectInput.value,
+            dueDate: dateInput.value,
+            completed: false
+        });
+
+        // 默认按日期先后排序
+        tasks.sort((a, b) => {
+            if (!a.dueDate) return 1;
+            if (!b.dueDate) return -1;
+            return a.dueDate.localeCompare(b.dueDate);
+        });
+
         saveTasks(tasks);
 
-        input.value = "";
+        taskInput.value = "";
+        dateInput.value = "";
         renderTasks();
     }
 
