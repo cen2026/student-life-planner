@@ -16,18 +16,45 @@
         .planner-card {
             background: #ffffff;
             width: 100%;
-            max-width: 480px;
+            max-width: 500px;
             padding: 24px;
             border-radius: 12px;
             box-shadow: 0 4px 16px rgba(0,0,0,0.08);
         }
         h2 { margin-top: 0; color: #2c3e50; text-align: center; }
-        
+
+        /* 顶部 Tab 切换 */
+        .tab-bar {
+            display: flex;
+            border-bottom: 2px solid #eaedf1;
+            margin-bottom: 20px;
+        }
+        .tab-btn {
+            flex: 1;
+            padding: 10px;
+            background: none;
+            border: none;
+            font-size: 15px;
+            font-weight: 600;
+            color: #6b7280;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            margin-bottom: -2px;
+        }
+        .tab-btn.active {
+            color: #3b82f6;
+            border-bottom-color: #3b82f6;
+        }
+
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* 表单与输入 */
         .input-form {
             display: flex;
             flex-direction: column;
             gap: 10px;
-            margin-bottom: 24px;
+            margin-bottom: 18px;
         }
         .input-row {
             display: flex;
@@ -39,15 +66,12 @@
             border-radius: 6px;
             font-size: 14px;
             outline: none;
+            box-sizing: border-box;
         }
-        input:focus, select:focus {
-            border-color: #3b82f6;
-        }
-        #taskInput { flex: 1; }
-        #subjectInput { flex: 1; }
-        #dateInput { flex: 1; }
+        input:focus, select:focus { border-color: #3b82f6; }
+        .flex-1 { flex: 1; }
 
-        button.add-btn {
+        button.action-btn {
             padding: 10px;
             background-color: #3b82f6;
             color: white;
@@ -57,8 +81,19 @@
             font-weight: 600;
             font-size: 14px;
         }
-        button.add-btn:hover { background-color: #2563eb; }
+        button.action-btn:hover { background-color: #2563eb; }
 
+        /* 筛选栏 */
+        .filter-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            font-size: 13px;
+            color: #6b7280;
+        }
+
+        /* 列表公用样式 */
         ul { list-style: none; padding: 0; margin: 0; }
         li {
             display: flex;
@@ -69,7 +104,6 @@
             padding: 12px;
             border-radius: 8px;
             margin-bottom: 10px;
-            transition: all 0.2s;
         }
         li.overdue {
             border-left: 4px solid #ef4444;
@@ -116,6 +150,25 @@
             background-color: #f3f4f6;
             color: #9ca3af;
         }
+
+        /* 记账样式 */
+        .expense-total {
+            background-color: #ecfdf5;
+            border: 1px solid #a7f3d0;
+            color: #065f46;
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 18px;
+        }
+        .expense-amount {
+            font-weight: bold;
+            color: #ef4444;
+            margin-right: 10px;
+        }
+
         .delete-btn {
             background: transparent;
             color: #9ca3af;
@@ -134,28 +187,87 @@
 <body>
 
 <div class="planner-card">
-    <h2>Campus Task Planner</h2>
-    
-    <div class="input-form">
-        <input type="text" id="taskInput" placeholder="Assignment or Exam title...">
-        <div class="input-row">
-            <select id="subjectInput">
+    <h2>Campus Life Planner</h2>
+
+    <!-- Tab 导航 -->
+    <div class="tab-bar">
+        <button class="tab-btn active" onclick="switchTab('tasks')">Assignments & Tasks</button>
+        <button class="tab-btn" onclick="switchTab('expenses')">Daily Expenses</button>
+    </div>
+
+    <!-- 面板 1：待办管理 -->
+    <div id="tab-tasks" class="tab-content active">
+        <div class="input-form">
+            <input type="text" id="taskInput" placeholder="Assignment or Exam title...">
+            <div class="input-row">
+                <select id="subjectInput" class="flex-1">
+                    <option value="GENERAL">General</option>
+                    <option value="OS">Operating Systems</option>
+                    <option value="ELECTIVE">Elective Course</option>
+                    <option value="OTHERS">Others</option>
+                </select>
+                <input type="date" id="dateInput" class="flex-1">
+            </div>
+            <button class="action-btn" onclick="addTask()">Add Assignment</button>
+        </div>
+
+        <div class="filter-row">
+            <span>Filter by Subject:</span>
+            <select id="filterSelect" onchange="renderTasks()">
+                <option value="ALL">All Subjects</option>
                 <option value="GENERAL">General</option>
                 <option value="OS">Operating Systems</option>
                 <option value="ELECTIVE">Elective Course</option>
                 <option value="OTHERS">Others</option>
             </select>
-            <input type="date" id="dateInput">
         </div>
-        <button class="add-btn" onclick="addTask()">Add Assignment</button>
+
+        <ul id="taskList"></ul>
     </div>
 
-    <ul id="taskList"></ul>
+    <!-- 面板 2：日用记账 -->
+    <div id="tab-expenses" class="tab-content">
+        <div class="expense-total" id="totalExpenseDisplay">Total Spent: RM 0.00</div>
+
+        <div class="input-form">
+            <input type="text" id="expenseTitleInput" placeholder="Item (e.g. Lunch, Bus, Notebook)...">
+            <div class="input-row">
+                <select id="expenseCategoryInput" class="flex-1">
+                    <option value="Food">Food & Beverage</option>
+                    <option value="Transport">Transport</option>
+                    <option value="Study">Study Materials</option>
+                    <option value="Others">Others</option>
+                </select>
+                <input type="number" id="expenseAmountInput" placeholder="RM Amount" step="0.10" class="flex-1">
+            </div>
+            <button class="action-btn" onclick="addExpense()">Record Expense</button>
+        </div>
+
+        <ul id="expenseList"></ul>
+    </div>
 </div>
 
 <script>
-    document.addEventListener("DOMContentLoaded", loadTasks);
+    document.addEventListener("DOMContentLoaded", () => {
+        renderTasks();
+        renderExpenses();
+    });
 
+    // 选项卡切换
+    function switchTab(tabName) {
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+
+        if (tabName === 'tasks') {
+            document.querySelectorAll('.tab-btn')[0].classList.add('active');
+            document.getElementById('tab-tasks').classList.add('active');
+        } else {
+            document.querySelectorAll('.tab-btn')[1].classList.add('active');
+            document.getElementById('tab-expenses').classList.add('active');
+        }
+    }
+
+    /* ================= 待办任务逻辑 ================= */
     function getStoredTasks() {
         let tasks = localStorage.getItem("planner_tasks_v2");
         return tasks ? JSON.parse(tasks) : [];
@@ -169,11 +281,13 @@
         const list = document.getElementById("taskList");
         list.innerHTML = "";
         const tasks = getStoredTasks();
+        const filter = document.getElementById("filterSelect").value;
         const todayStr = new Date().toISOString().split('T')[0];
 
         tasks.forEach((task, index) => {
+            if (filter !== "ALL" && task.subject !== filter) return;
+
             const li = document.createElement("li");
-            
             const isOverdue = task.dueDate && task.dueDate < todayStr && !task.completed;
             if (isOverdue) li.classList.add("overdue");
             if (task.completed) li.classList.add("completed");
@@ -224,10 +338,6 @@
         });
     }
 
-    function loadTasks() {
-        renderTasks();
-    }
-
     function addTask() {
         const taskInput = document.getElementById("taskInput");
         const subjectInput = document.getElementById("subjectInput");
@@ -244,7 +354,6 @@
             completed: false
         });
 
-        // 默认按日期先后排序
         tasks.sort((a, b) => {
             if (!a.dueDate) return 1;
             if (!b.dueDate) return -1;
@@ -252,7 +361,6 @@
         });
 
         saveTasks(tasks);
-
         taskInput.value = "";
         dateInput.value = "";
         renderTasks();
@@ -270,6 +378,102 @@
         tasks.splice(index, 1);
         saveTasks(tasks);
         renderTasks();
+    }
+
+    /* ================= 记账功能逻辑 ================= */
+    function getStoredExpenses() {
+        let expenses = localStorage.getItem("planner_expenses_v1");
+        return expenses ? JSON.parse(expenses) : [];
+    }
+
+    function saveExpenses(expenses) {
+        localStorage.setItem("planner_expenses_v1", JSON.stringify(expenses));
+    }
+
+    function renderExpenses() {
+        const list = document.getElementById("expenseList");
+        list.innerHTML = "";
+        const expenses = getStoredExpenses();
+        let total = 0;
+
+        expenses.forEach((item, index) => {
+            total += parseFloat(item.amount) || 0;
+
+            const li = document.createElement("li");
+
+            const infoDiv = document.createElement("div");
+            infoDiv.className = "task-info";
+
+            const title = document.createElement("div");
+            title.className = "task-title";
+            title.textContent = item.title;
+
+            const meta = document.createElement("div");
+            meta.className = "task-meta";
+
+            const tag = document.createElement("span");
+            tag.className = "tag";
+            tag.textContent = item.category;
+            meta.appendChild(tag);
+
+            infoDiv.appendChild(title);
+            infoDiv.appendChild(meta);
+
+            const rightDiv = document.createElement("div");
+            rightDiv.style.display = "flex";
+            rightDiv.style.alignItems = "center";
+
+            const amountSpan = document.createElement("span");
+            amountSpan.className = "expense-amount";
+            amountSpan.textContent = `- RM ${parseFloat(item.amount).toFixed(2)}`;
+
+            const delBtn = document.createElement("button");
+            delBtn.className = "delete-btn";
+            delBtn.innerHTML = "&times;";
+            delBtn.onclick = () => deleteExpense(index);
+
+            rightDiv.appendChild(amountSpan);
+            rightDiv.appendChild(delBtn);
+
+            li.appendChild(infoDiv);
+            li.appendChild(rightDiv);
+            list.appendChild(li);
+        });
+
+        document.getElementById("totalExpenseDisplay").textContent = `Total Spent: RM ${total.toFixed(2)}`;
+    }
+
+    function addExpense() {
+        const titleInput = document.getElementById("expenseTitleInput");
+        const categoryInput = document.getElementById("expenseCategoryInput");
+        const amountInput = document.getElementById("expenseAmountInput");
+
+        const title = titleInput.value.trim();
+        const amount = parseFloat(amountInput.value);
+
+        if (!title || isNaN(amount) || amount <= 0) {
+            alert("Please enter a valid expense description and amount!");
+            return;
+        }
+
+        const expenses = getStoredExpenses();
+        expenses.unshift({
+            title: title,
+            category: categoryInput.value,
+            amount: amount
+        });
+
+        saveExpenses(expenses);
+        titleInput.value = "";
+        amountInput.value = "";
+        renderExpenses();
+    }
+
+    function deleteExpense(index) {
+        const expenses = getStoredExpenses();
+        expenses.splice(index, 1);
+        saveExpenses(expenses);
+        renderExpenses();
     }
 </script>
 
