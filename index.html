@@ -4,185 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Student Life Planner</title>
-    <style>
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #f4f6f9;
-            display: flex;
-            justify-content: center;
-            padding: 30px 15px;
-            margin: 0;
-        }
-        .planner-card {
-            background: #ffffff;
-            width: 100%;
-            max-width: 500px;
-            padding: 24px;
-            border-radius: 12px;
-            box-shadow: 0 4px 16px rgba(0,0,0,0.08);
-        }
-        h2 { margin-top: 0; color: #2c3e50; text-align: center; }
-
-        /* 顶部 Tab 切换 */
-        .tab-bar {
-            display: flex;
-            border-bottom: 2px solid #eaedf1;
-            margin-bottom: 20px;
-        }
-        .tab-btn {
-            flex: 1;
-            padding: 10px;
-            background: none;
-            border: none;
-            font-size: 15px;
-            font-weight: 600;
-            color: #6b7280;
-            cursor: pointer;
-            border-bottom: 3px solid transparent;
-            margin-bottom: -2px;
-        }
-        .tab-btn.active {
-            color: #3b82f6;
-            border-bottom-color: #3b82f6;
-        }
-
-        .tab-content { display: none; }
-        .tab-content.active { display: block; }
-
-        /* 表单与输入 */
-        .input-form {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            margin-bottom: 18px;
-        }
-        .input-row {
-            display: flex;
-            gap: 10px;
-        }
-        input, select {
-            padding: 9px 12px;
-            border: 1px solid #dcdfe6;
-            border-radius: 6px;
-            font-size: 14px;
-            outline: none;
-            box-sizing: border-box;
-        }
-        input:focus, select:focus { border-color: #3b82f6; }
-        .flex-1 { flex: 1; }
-
-        button.action-btn {
-            padding: 10px;
-            background-color: #3b82f6;
-            color: white;
-            border: none;
-            border-radius: 6px;
-            cursor: pointer;
-            font-weight: 600;
-            font-size: 14px;
-        }
-        button.action-btn:hover { background-color: #2563eb; }
-
-        /* 筛选栏 */
-        .filter-row {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 12px;
-            font-size: 13px;
-            color: #6b7280;
-        }
-
-        /* 列表公用样式 */
-        ul { list-style: none; padding: 0; margin: 0; }
-        li {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            background: #ffffff;
-            border: 1px solid #eaedf1;
-            padding: 12px;
-            border-radius: 8px;
-            margin-bottom: 10px;
-        }
-        li.overdue {
-            border-left: 4px solid #ef4444;
-            background: #fff5f5;
-        }
-        .task-left {
-            display: flex;
-            align-items: flex-start;
-            gap: 10px;
-        }
-        .task-info {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-        .task-title {
-            font-size: 15px;
-            color: #1f2937;
-            font-weight: 500;
-        }
-        .task-meta {
-            font-size: 12px;
-            color: #6b7280;
-            display: flex;
-            gap: 8px;
-            align-items: center;
-        }
-        .tag {
-            background-color: #e0f2fe;
-            color: #0369a1;
-            padding: 2px 6px;
-            border-radius: 4px;
-            font-weight: 600;
-        }
-        .due-text.is-overdue {
-            color: #dc2626;
-            font-weight: 600;
-        }
-        .completed .task-title {
-            text-decoration: line-through;
-            color: #9ca3af;
-        }
-        .completed .tag {
-            background-color: #f3f4f6;
-            color: #9ca3af;
-        }
-
-        /* 记账样式 */
-        .expense-total {
-            background-color: #ecfdf5;
-            border: 1px solid #a7f3d0;
-            color: #065f46;
-            padding: 12px;
-            border-radius: 8px;
-            text-align: center;
-            font-size: 16px;
-            font-weight: bold;
-            margin-bottom: 18px;
-        }
-        .expense-amount {
-            font-weight: bold;
-            color: #ef4444;
-            margin-right: 10px;
-        }
-
-        .delete-btn {
-            background: transparent;
-            color: #9ca3af;
-            border: none;
-            font-size: 16px;
-            cursor: pointer;
-            padding: 4px 8px;
-            border-radius: 4px;
-        }
-        .delete-btn:hover {
-            color: #ef4444;
-            background-color: #fee2e2;
-        }
-    </style>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
@@ -253,7 +75,6 @@
         renderExpenses();
     });
 
-    // 选项卡切换
     function switchTab(tabName) {
         document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
         document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
@@ -267,7 +88,7 @@
         }
     }
 
-    /* ================= 待办任务逻辑 ================= */
+    /* 待办任务逻辑 */
     function getStoredTasks() {
         let tasks = localStorage.getItem("planner_tasks_v2");
         return tasks ? JSON.parse(tasks) : [];
@@ -380,7 +201,7 @@
         renderTasks();
     }
 
-    /* ================= 记账功能逻辑 ================= */
+    /* 记账逻辑 */
     function getStoredExpenses() {
         let expenses = localStorage.getItem("planner_expenses_v1");
         return expenses ? JSON.parse(expenses) : [];
