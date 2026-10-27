@@ -36,7 +36,6 @@ body {
     border: 1px solid var(--border-color);
 }
 
-/* 头部与设置按钮 */
 .header-row {
     display: flex;
     justify-content: space-between;
@@ -79,7 +78,7 @@ body {
 
 .tab-btn {
     flex: 1;
-    padding: 10px 0;
+    padding: 9px 0;
     background: transparent;
     border: none;
     font-size: 13px;
@@ -162,7 +161,6 @@ button.secondary-btn {
     white-space: nowrap;
 }
 
-/* 筛选栏 */
 .filter-row {
     display: flex;
     justify-content: space-between;
@@ -256,6 +254,104 @@ input[type="checkbox"] {
 
 .completed .task-title { text-decoration: line-through; color: #94a3b8; }
 
+/* ================= 📅 日历网格专属样式 ================= */
+.calendar-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+}
+.calendar-header h3 {
+    font-size: 16px;
+    color: var(--text-main);
+    margin: 0;
+}
+.cal-nav-btn {
+    background: #f1f5f9;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 4px 12px;
+    cursor: pointer;
+    font-weight: bold;
+}
+.cal-nav-btn:hover { background: #e2e8f0; }
+
+.calendar-weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    text-align: center;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text-muted);
+    margin-bottom: 6px;
+}
+
+.calendar-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 4px;
+    margin-bottom: 20px;
+}
+
+.cal-day {
+    min-height: 64px;
+    background: #ffffff;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 4px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    font-size: 11px;
+    transition: all 0.15s ease;
+}
+.cal-day.empty {
+    background: #f8fafc;
+    border: 1px dashed #f1f5f9;
+}
+.cal-day.today {
+    border-color: var(--primary);
+    background-color: #f5f3ff;
+}
+.cal-day-num {
+    font-weight: 700;
+    color: var(--text-main);
+    margin-bottom: 2px;
+}
+.cal-events {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    overflow: hidden;
+}
+.cal-event-pill {
+    font-size: 9px;
+    padding: 1px 3px;
+    border-radius: 3px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 600;
+    cursor: default;
+}
+
+.cal-pill-freeze { background: #fef3c7; color: #b45309; }
+.cal-pill-hard { background: #fee2e2; color: #b91c1c; }
+.cal-pill-exam { background: #e0e7ff; color: #3730a3; }
+
+.calendar-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 10px;
+}
+.cal-tip {
+    font-size: 12px;
+    color: var(--text-muted);
+    line-height: 1.4;
+    margin: 0;
+}
+
 /* 记账总计 */
 .expense-total {
     background: linear-gradient(135deg, #059669, #10b981);
@@ -286,7 +382,7 @@ input[type="checkbox"] {
 }
 .delete-btn:hover { color: var(--danger); background-color: var(--danger-bg); }
 
-/* ⚙️ 弹窗样式 (Modal) */
+/* ⚙️ 弹窗样式 */
 .modal-overlay {
     position: fixed;
     top: 0;

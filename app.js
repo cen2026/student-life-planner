@@ -1,4 +1,3 @@
-// 学期与配置默认值
 const DEFAULT_CONFIG = {
     semesterName: "Year 2 Semester 1",
     startDate: "",
@@ -12,11 +11,15 @@ const DEFAULT_CONFIG = {
     ]
 };
 
+// 当前日历正在查看的月份
+let calDate = new Date();
+
 document.addEventListener("DOMContentLoaded", () => {
     loadSemesterConfig();
     populateCourseDropdowns();
     renderAssignments();
     renderStudyTasks();
+    renderCalendar();
     renderExpenses();
 });
 
@@ -28,14 +31,19 @@ function switchTab(tabName) {
     const tabMap = {
         'assignments': 0,
         'study': 1,
-        'expenses': 2
+        'calendar': 2,
+        'expenses': 3
     };
 
     document.querySelectorAll('.tab-btn')[tabMap[tabName]].classList.add('active');
     document.getElementById(`tab-${tabName}`).classList.add('active');
+
+    if (tabName === 'calendar') {
+        renderCalendar();
+    }
 }
 
-/* ================= ⚙️ 学期配置与弹窗逻辑 ================= */
+/* ================= ⚙️ 学期配置逻辑 ================= */
 function getConfig() {
     let cfg = localStorage.getItem("planner_semester_cfg_v1");
     return cfg ? JSON.parse(cfg) : DEFAULT_CONFIG;
@@ -131,6 +139,7 @@ function saveSemesterSettings() {
     closeSettings();
     renderAssignments();
     renderStudyTasks();
+    renderCalendar();
 }
 
 function populateCourseDropdowns() {
@@ -168,7 +177,7 @@ function populateCourseDropdowns() {
     });
 }
 
-/* ================= 🎯 Assignment (双死线) ================= */
+/* ================= 🎯 Assignments ================= */
 function getStoredAssignments() {
     let data = localStorage.getItem("planner_assign_v1");
     return data ? JSON.parse(data) : [];
@@ -263,16 +272,15 @@ function addAssignment() {
     if (!text) return;
 
     const items = getStoredAssignments();
-    items.push({
-        text, subject, targetDate, hardDate, completed: false
-    });
-
+    items.push({ text, subject, targetDate, hardDate, completed: false });
     items.sort((a, b) => (a.targetDate || a.hardDate || '9999').localeCompare(b.targetDate || b.hardDate || '9999'));
+
     saveAssignments(items);
     input.value = "";
     document.getElementById("assignTargetDate").value = "";
     document.getElementById("assignHardDate").value = "";
     renderAssignments();
+    renderCalendar();
 }
 
 function toggleAssignment(idx) {
@@ -287,9 +295,10 @@ function deleteAssignment(idx) {
     items.splice(idx, 1);
     saveAssignments(items);
     renderAssignments();
+    renderCalendar();
 }
 
-/* ================= 📚 Study & Routine (单死线/讲义日常) ================= */
+/* ================= 📚 Study Tasks ================= */
 function getStoredStudyTasks() {
     let data = localStorage.getItem("planner_study_v1");
     return data ? JSON.parse(data) : [];
@@ -380,6 +389,7 @@ function addStudyTask() {
     input.value = "";
     document.getElementById("studyDateInput").value = "";
     renderStudyTasks();
+    renderCalendar();
 }
 
 function toggleStudyTask(idx) {
@@ -394,6 +404,140 @@ function deleteStudyTask(idx) {
     items.splice(idx, 1);
     saveStudyTasks(items);
     renderStudyTasks();
+    renderCalendar();
+}
+
+/* ================= 📅 日历渲染与 Google Calendar 导出 ================= */
+function changeMonth(delta) {
+    calDate.setMonth(calDate.getMonth() + delta);
+    renderCalendar();
+}
+
+function renderCalendar() {
+    const grid = document.getElementById("calendarGrid");
+    if (!grid) return;
+    grid.innerHTML = "";
+
+    const year = calDate.getFullYear();
+    const month = calDate.getMonth();
+
+    const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+    document.getElementById("calendarMonthYearDisplay").textContent = `${monthNames[month]} ${year}`;
+
+    const firstDayIndex = new Date(year, month, 1).getDay();
+    const totalDays = new Date(year, month + 1, 0).getDate();
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    // 聚合所有事件
+    const cfg = getConfig();
+    const assigns = getStoredAssignments();
+    const studyTasks = getStoredStudyTasks();
+
+    const eventMap = {}; // 'YYYY-MM-DD' => [{ text, type }]
+
+    const addEvent = (dStr, text, type) => {
+        if (!dStr) return;
+        if (!eventMap[dStr]) eventMap[dStr] = [];
+        eventMap[dStr].push({ text, type });
+    };
+
+    if (cfg.midtermDate) addEvent(cfg.midtermDate, "Midterm Start", "exam");
+    if (cfg.finalDate) addEvent(cfg.finalDate, "Final Exam Start", "exam");
+
+    assigns.forEach(a => {
+        if (!a.completed) {
+            if (a.targetDate) addEvent(a.targetDate, `🎯 ${a.text}`, "freeze");
+            if (a.hardDate) addEvent(a.hardDate, `🚨 ${a.text}`, "hard");
+        }
+    });
+
+    studyTasks.forEach(s => {
+        if (!s.completed && s.date) addEvent(s.date, `📚 ${s.text}`, "freeze");
+    });
+
+    // 填补前置空白格
+    for (let i = 0; i < firstDayIndex; i++) {
+        const emptyCell = document.createElement("div");
+        emptyCell.className = "cal-day empty";
+        grid.appendChild(emptyCell);
+    }
+
+    // 渲染每一天
+    for (let day = 1; day <= totalDays; day++) {
+        const cell = document.createElement("div");
+        cell.className = "cal-day";
+
+        const mStr = String(month + 1).padStart(2, '0');
+        const dStr = String(day).padStart(2, '0');
+        const currDateStr = `${year}-${mStr}-${dStr}`;
+
+        if (currDateStr === todayStr) cell.classList.add("today");
+
+        const numDiv = document.createElement("div");
+        numDiv.className = "cal-day-num";
+        numDiv.textContent = day;
+        cell.appendChild(numDiv);
+
+        const eventsDiv = document.createElement("div");
+        eventsDiv.className = "cal-events";
+
+        if (eventMap[currDateStr]) {
+            eventMap[currDateStr].forEach(ev => {
+                const pill = document.createElement("div");
+                pill.className = `cal-event-pill cal-pill-${ev.type}`;
+                pill.textContent = ev.text;
+                pill.title = ev.text;
+                eventsDiv.appendChild(pill);
+            });
+        }
+
+        cell.appendChild(eventsDiv);
+        grid.appendChild(cell);
+    }
+}
+
+// 导出为标准 iCalendar (.ics) 文件，供 Google Calendar 直接导入
+function exportToICS() {
+    const cfg = getConfig();
+    const assigns = getStoredAssignments();
+
+    let icsContent = [
+        "BEGIN:VCALENDAR",
+        "VERSION:2.0",
+        "PRODID:-//Academic Sprint Planner//EN"
+    ];
+
+    const formatDateICS = (dStr) => dStr.replace(/-/g, "") + "T090000Z";
+
+    const addVEvent = (title, dStr, desc) => {
+        if (!dStr) return;
+        const dt = formatDateICS(dStr);
+        icsContent.push("BEGIN:VEVENT");
+        icsContent.push(`SUMMARY:${title}`);
+        icsContent.push(`DESCRIPTION:${desc}`);
+        icsContent.push(`DTSTART:${dt}`);
+        icsContent.push(`DTEND:${dt}`);
+        icsContent.push("STATUS:CONFIRMED");
+        icsContent.push("END:VEVENT");
+    };
+
+    if (cfg.midtermDate) addVEvent("Midterm Exam Week", cfg.midtermDate, "Midterm examination week starts.");
+    if (cfg.finalDate) addVEvent("Final Exam Week", cfg.finalDate, "Final examination week starts.");
+
+    assigns.forEach(a => {
+        if (a.targetDate) addVEvent(`[Target Freeze] ${a.text}`, a.targetDate, `v1.0 Done. Course: ${a.subject}`);
+        if (a.hardDate) addVEvent(`[Hard Deadline] ${a.text}`, a.hardDate, `Official Deadline. Course: ${a.subject}`);
+    });
+
+    icsContent.push("END:VCALENDAR");
+
+    const blob = new Blob([icsContent.join("\r\n")], { type: "text/calendar;charset=utf-8" });
+    const link = document.createElement("a");
+    link.href = window.URL.createObjectURL(blob);
+    link.setAttribute("download", `${cfg.semesterName || 'Semester'}_Schedule.ics`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
 }
 
 /* ================= 💰 记账功能 ================= */

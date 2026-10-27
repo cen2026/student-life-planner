@@ -18,10 +18,11 @@
         <button class="icon-btn" onclick="openSettings()" title="Semester & Course Settings">⚙️</button>
     </div>
 
-    <!-- 顶部 Tab 导航（三大解耦面板） -->
+    <!-- 顶部 Tab 导航 -->
     <div class="tab-bar">
         <button class="tab-btn active" onclick="switchTab('assignments')">🎯 Assignments</button>
-        <button class="tab-btn" onclick="switchTab('study')">📚 Study & Routines</button>
+        <button class="tab-btn" onclick="switchTab('study')">📚 Study</button>
+        <button class="tab-btn" onclick="switchTab('calendar')">📅 Calendar</button>
         <button class="tab-btn" onclick="switchTab('expenses')">💰 Expenses</button>
     </div>
 
@@ -55,7 +56,7 @@
         <ul id="assignmentList"></ul>
     </div>
 
-    <!-- 面板 2：日常讲义与练习 (单死线/防课业债务) -->
+    <!-- 面板 2：日常讲义与练习 -->
     <div id="tab-study" class="tab-content">
         <div class="input-form">
             <input type="text" id="studyTaskInput" placeholder="e.g. Week 4 OS Lecture Recording, Tutorial 3...">
@@ -78,7 +79,30 @@
         <ul id="studyList"></ul>
     </div>
 
-    <!-- 面板 3：日用记账 -->
+    <!-- 面板 3：📅 学期日历与 Google Calendar 联动 -->
+    <div id="tab-calendar" class="tab-content">
+        <div class="calendar-header">
+            <button class="cal-nav-btn" onclick="changeMonth(-1)">&lt;</button>
+            <h3 id="calendarMonthYearDisplay">Month Year</h3>
+            <button class="cal-nav-btn" onclick="changeMonth(1)">&gt;</button>
+        </div>
+
+        <!-- 星期表头 -->
+        <div class="calendar-weekdays">
+            <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
+        </div>
+
+        <!-- 日历网格 -->
+        <div id="calendarGrid" class="calendar-grid"></div>
+
+        <!-- Google Calendar 导出与说明 -->
+        <div class="calendar-actions">
+            <button class="action-btn" onclick="exportToICS()">📥 Export to Google Calendar (.ics)</button>
+            <p class="cal-tip">💡 Click to download an .ics file, then import it directly into Google Calendar to sync all deadlines and exam weeks to your phone!</p>
+        </div>
+    </div>
+
+    <!-- 面板 4：日用记账 -->
     <div id="tab-expenses" class="tab-content">
         <div class="expense-total" id="totalExpenseDisplay">Total Spent: RM 0.00</div>
 
@@ -100,7 +124,7 @@
     </div>
 </div>
 
-<!-- ⚙️ 设置弹窗 (Modal) -->
+<!-- ⚙️ 设置弹窗 -->
 <div id="settingsModal" class="modal-overlay" style="display: none;">
     <div class="modal-content">
         <div class="modal-header">
@@ -109,7 +133,6 @@
         </div>
         
         <div class="modal-body">
-            <!-- 学期基本时间线 -->
             <div class="config-section">
                 <h4>Semester Timeline</h4>
                 <div class="input-group-row">
@@ -138,7 +161,6 @@
                 </div>
             </div>
 
-            <!-- 本学期科目列表 -->
             <div class="config-section">
                 <h4>Courses for this Semester</h4>
                 <div class="input-row">
