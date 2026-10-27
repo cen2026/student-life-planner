@@ -59,14 +59,15 @@
     <!-- 面板 2：日常讲义与练习 -->
     <div id="tab-study" class="tab-content">
         <div class="input-form">
-            <input type="text" id="studyTaskInput" placeholder="e.g. Week 4 OS Lecture Recording, Tutorial 3...">
+            <input type="text" id="studyTaskInput" placeholder="e.g. Week 4 OS Lecture Recording, Lab 3...">
             <div class="input-row">
                 <select id="studySubjectSelect" class="flex-1"></select>
                 <div class="date-group flex-1">
-                    <input type="date" id="studyDateInput" placeholder="Target Review Date">
+                    <label for="studyOriginalDate">📅 Lecture Ended On (上课/原定日期):</label>
+                    <input type="date" id="studyOriginalDate">
                 </div>
             </div>
-            <button class="action-btn" onclick="addStudyTask()">Add Study Task</button>
+            <button class="action-btn" onclick="addStudyTask()">Log Lecture Debt / Task</button>
         </div>
 
         <div class="filter-row">

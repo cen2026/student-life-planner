@@ -298,14 +298,23 @@ function deleteAssignment(idx) {
     renderCalendar();
 }
 
-/* ================= 📚 Study Tasks ================= */
+/* ================= 📚 Study Tasks (课业负债与拖延计算) ================= */
 function getStoredStudyTasks() {
-    let data = localStorage.getItem("planner_study_v1");
+    let data = localStorage.getItem("planner_study_v2");
     return data ? JSON.parse(data) : [];
 }
 
 function saveStudyTasks(data) {
-    localStorage.setItem("planner_study_v1", JSON.stringify(data));
+    localStorage.setItem("planner_study_v2", JSON.stringify(data));
+}
+
+// 计算两日期间隔天数 (YYYY-MM-DD)
+function calculateDaysDiff(startDateStr, endDateStr) {
+    if (!startDateStr || !endDateStr) return 0;
+    const start = new Date(startDateStr);
+    const end = new Date(endDateStr);
+    const diffTime = end - start;
+    return Math.floor(diffTime / (1000 * 60 * 60 * 24));
 }
 
 function renderStudyTasks() {
@@ -320,8 +329,20 @@ function renderStudyTasks() {
         if (filter !== "ALL" && item.subject !== filter) return;
 
         const li = document.createElement("li");
-        const isOverdue = item.date && item.date < todayStr && !item.completed;
-        if (isOverdue) li.className = "status-overdue";
+
+        // 计算拖延天数
+        let delayDays = 0;
+        let isDelayed = false;
+
+        if (item.originalDate) {
+            const compareDate = item.completed ? (item.completedDate || todayStr) : todayStr;
+            delayDays = calculateDaysDiff(item.originalDate, compareDate);
+            if (delayDays > 0) isDelayed = true;
+        }
+
+        if (!item.completed && isDelayed) {
+            li.className = delayDays >= 4 ? "status-overdue" : "status-freeze";
+        }
         if (item.completed) li.classList.add("completed");
 
         const leftDiv = document.createElement("div");
@@ -342,6 +363,7 @@ function renderStudyTasks() {
         const meta = document.createElement("div");
         meta.className = "task-meta";
 
+        // 科目标签
         const matchedCourse = cfg.courses.find(c => c.name === item.subject) || { color: "#64748b", bg: "#f1f5f9" };
         const tag = document.createElement("span");
         tag.className = "tag-badge";
@@ -350,11 +372,33 @@ function renderStudyTasks() {
         tag.textContent = item.subject;
         meta.appendChild(tag);
 
-        if (item.date) {
-            const dBadge = document.createElement("span");
-            dBadge.className = `date-badge ${isOverdue ? 'hard-overdue' : ''}`;
-            dBadge.textContent = isOverdue ? `Overdue: ${item.date}` : `Review: ${item.date}`;
-            meta.appendChild(dBadge);
+        // 原上课日期
+        if (item.originalDate) {
+            const dateBadge = document.createElement("span");
+            dateBadge.className = "date-badge";
+            dateBadge.textContent = `Ended: ${item.originalDate}`;
+            meta.appendChild(dateBadge);
+        }
+
+        // 拖延天数徽章 (核心负债指标)
+        if (item.originalDate) {
+            const delayBadge = document.createElement("span");
+            if (item.completed) {
+                delayBadge.className = "delay-badge delay-completed";
+                delayBadge.textContent = delayDays > 0 ? `✓ 迟了 ${delayDays} 天补完` : "✓ 准时补完";
+            } else {
+                if (delayDays > 0) {
+                    delayBadge.className = `delay-badge ${delayDays >= 4 ? 'delay-severe' : 'delay-mild'}`;
+                    delayBadge.textContent = `⏳ 拖欠了 ${delayDays} 天`;
+                } else if (delayDays === 0) {
+                    delayBadge.className = "delay-badge delay-mild";
+                    delayBadge.textContent = "⚡ 今天刚结束";
+                } else {
+                    delayBadge.className = "delay-badge delay-completed";
+                    delayBadge.textContent = "未到期课程";
+                }
+            }
+            meta.appendChild(delayBadge);
         }
 
         infoDiv.appendChild(title);
@@ -376,27 +420,44 @@ function renderStudyTasks() {
 function addStudyTask() {
     const input = document.getElementById("studyTaskInput");
     const subject = document.getElementById("studySubjectSelect").value;
-    const date = document.getElementById("studyDateInput").value;
+    const originalDate = document.getElementById("studyOriginalDate").value;
 
     const text = input.value.trim();
     if (!text) return;
 
     const items = getStoredStudyTasks();
-    items.push({ text, subject, date, completed: false });
-    items.sort((a, b) => (a.date || '9999').localeCompare(b.date || '9999'));
+    items.push({
+        text,
+        subject,
+        originalDate,
+        completed: false,
+        completedDate: null
+    });
+
+    // 智能排序：优先把未完成且拖延最久的排在最前面
+    const todayStr = new Date().toISOString().split('T')[0];
+    items.sort((a, b) => {
+        if (a.completed !== b.completed) return a.completed ? 1 : -1;
+        const delayA = a.originalDate ? calculateDaysDiff(a.originalDate, todayStr) : -999;
+        const delayB = b.originalDate ? calculateDaysDiff(b.originalDate, todayStr) : -999;
+        return delayB - delayA; // 拖延天数多的置顶
+    });
 
     saveStudyTasks(items);
     input.value = "";
-    document.getElementById("studyDateInput").value = "";
+    document.getElementById("studyOriginalDate").value = "";
     renderStudyTasks();
-    renderCalendar();
+    if (typeof renderCalendar === "function") renderCalendar();
 }
 
 function toggleStudyTask(idx) {
     const items = getStoredStudyTasks();
+    const todayStr = new Date().toISOString().split('T')[0];
     items[idx].completed = !items[idx].completed;
+    items[idx].completedDate = items[idx].completed ? todayStr : null;
     saveStudyTasks(items);
     renderStudyTasks();
+    if (typeof renderCalendar === "function") renderCalendar();
 }
 
 function deleteStudyTask(idx) {
@@ -404,7 +465,7 @@ function deleteStudyTask(idx) {
     items.splice(idx, 1);
     saveStudyTasks(items);
     renderStudyTasks();
-    renderCalendar();
+    if (typeof renderCalendar === "function") renderCalendar();
 }
 
 /* ================= 📅 日历渲染与 Google Calendar 导出 ================= */
