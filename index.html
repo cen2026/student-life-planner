@@ -3,57 +3,87 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Student Life Planner</title>
-    <!-- 引入外部样式 -->
+    <title>Academic Sprint Planner</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
 <div class="planner-card">
-    <h2>Campus Life Planner</h2>
-
-    <!-- Tab 导航 -->
-    <div class="tab-bar">
-        <button class="tab-btn active" onclick="switchTab('tasks')">Assignments & Tasks</button>
-        <button class="tab-btn" onclick="switchTab('expenses')">Daily Expenses</button>
+    <!-- 头部：学期标题与设置齿轮 -->
+    <div class="header-row">
+        <div>
+            <h2 id="semesterTitleDisplay">Academic Sprint Planner</h2>
+            <div id="semesterDatesDisplay" class="semester-subtitle">Loading semester schedule...</div>
+        </div>
+        <button class="icon-btn" onclick="openSettings()" title="Semester & Course Settings">⚙️</button>
     </div>
 
-    <!-- 面板 1：待办管理 -->
-    <div id="tab-tasks" class="tab-content active">
+    <!-- 顶部 Tab 导航（三大解耦面板） -->
+    <div class="tab-bar">
+        <button class="tab-btn active" onclick="switchTab('assignments')">🎯 Assignments</button>
+        <button class="tab-btn" onclick="switchTab('study')">📚 Study & Routines</button>
+        <button class="tab-btn" onclick="switchTab('expenses')">💰 Expenses</button>
+    </div>
+
+    <!-- 面板 1：大作业/项目 (双死线) -->
+    <div id="tab-assignments" class="tab-content active">
         <div class="input-form">
-            <input type="text" id="taskInput" placeholder="Assignment or Exam title...">
+            <input type="text" id="assignInput" placeholder="Assignment / Project Name...">
             <div class="input-row">
-                <select id="subjectInput" class="flex-1">
-                    <option value="GENERAL">General</option>
-                    <option value="OS">Operating Systems</option>
-                    <option value="ELECTIVE">Elective Course</option>
-                    <option value="OTHERS">Others</option>
-                </select>
-                <input type="date" id="dateInput" class="flex-1">
+                <select id="assignSubjectSelect" class="flex-1"></select>
             </div>
-            <button class="action-btn" onclick="addTask()">Add Assignment</button>
+            <div class="input-row">
+                <div class="date-group flex-1">
+                    <label for="assignTargetDate">🎯 Target Freeze Date (v1.0 Done):</label>
+                    <input type="date" id="assignTargetDate">
+                </div>
+                <div class="date-group flex-1">
+                    <label for="assignHardDate">🚨 Official Hard Deadline:</label>
+                    <input type="date" id="assignHardDate">
+                </div>
+            </div>
+            <button class="action-btn" onclick="addAssignment()">Add Assignment Sprint</button>
         </div>
 
         <div class="filter-row">
-            <span>Filter by Subject:</span>
-            <select id="filterSelect" onchange="renderTasks()">
-                <option value="ALL">All Subjects</option>
-                <option value="GENERAL">General</option>
-                <option value="OS">Operating Systems</option>
-                <option value="ELECTIVE">Elective Course</option>
-                <option value="OTHERS">Others</option>
+            <span>Filter by Course:</span>
+            <select id="assignFilterSelect" onchange="renderAssignments()">
+                <option value="ALL">All Courses</option>
             </select>
         </div>
 
-        <ul id="taskList"></ul>
+        <ul id="assignmentList"></ul>
     </div>
 
-    <!-- 面板 2：日用记账 -->
+    <!-- 面板 2：日常讲义与练习 (单死线/防课业债务) -->
+    <div id="tab-study" class="tab-content">
+        <div class="input-form">
+            <input type="text" id="studyTaskInput" placeholder="e.g. Week 4 OS Lecture Recording, Tutorial 3...">
+            <div class="input-row">
+                <select id="studySubjectSelect" class="flex-1"></select>
+                <div class="date-group flex-1">
+                    <input type="date" id="studyDateInput" placeholder="Target Review Date">
+                </div>
+            </div>
+            <button class="action-btn" onclick="addStudyTask()">Add Study Task</button>
+        </div>
+
+        <div class="filter-row">
+            <span>Filter by Course:</span>
+            <select id="studyFilterSelect" onchange="renderStudyTasks()">
+                <option value="ALL">All Courses</option>
+            </select>
+        </div>
+
+        <ul id="studyList"></ul>
+    </div>
+
+    <!-- 面板 3：日用记账 -->
     <div id="tab-expenses" class="tab-content">
         <div class="expense-total" id="totalExpenseDisplay">Total Spent: RM 0.00</div>
 
         <div class="input-form">
-            <input type="text" id="expenseTitleInput" placeholder="Item (e.g. Lunch, Bus, Notebook)...">
+            <input type="text" id="expenseTitleInput" placeholder="Item (e.g. Lunch, Bus, Books)...">
             <div class="input-row">
                 <select id="expenseCategoryInput" class="flex-1">
                     <option value="Food">Food & Beverage</option>
@@ -70,7 +100,61 @@
     </div>
 </div>
 
-<!-- 引入外部逻辑脚本 -->
+<!-- ⚙️ 设置弹窗 (Modal) -->
+<div id="settingsModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>⚙️ Semester Configuration</h3>
+            <button class="close-btn" onclick="closeSettings()">&times;</button>
+        </div>
+        
+        <div class="modal-body">
+            <!-- 学期基本时间线 -->
+            <div class="config-section">
+                <h4>Semester Timeline</h4>
+                <div class="input-group-row">
+                    <label>Semester Name:</label>
+                    <input type="text" id="cfgSemName" placeholder="e.g. Year 2 Semester 1">
+                </div>
+                <div class="input-row">
+                    <div class="date-group flex-1">
+                        <label>Start Date:</label>
+                        <input type="date" id="cfgStartDate">
+                    </div>
+                    <div class="date-group flex-1">
+                        <label>End Date:</label>
+                        <input type="date" id="cfgEndDate">
+                    </div>
+                </div>
+                <div class="input-row">
+                    <div class="date-group flex-1">
+                        <label>Midterm Exam Week Start:</label>
+                        <input type="date" id="cfgMidtermDate">
+                    </div>
+                    <div class="date-group flex-1">
+                        <label>Final Exam Week Start:</label>
+                        <input type="date" id="cfgFinalDate">
+                    </div>
+                </div>
+            </div>
+
+            <!-- 本学期科目列表 -->
+            <div class="config-section">
+                <h4>Courses for this Semester</h4>
+                <div class="input-row">
+                    <input type="text" id="cfgCourseInput" placeholder="Course title (e.g. Operating Systems)...">
+                    <button class="secondary-btn" onclick="addCourseFromModal()">+ Add</button>
+                </div>
+                <div id="cfgCourseChips" class="chip-container"></div>
+            </div>
+        </div>
+
+        <div class="modal-footer">
+            <button class="action-btn" onclick="saveSemesterSettings()">Save Settings</button>
+        </div>
+    </div>
+</div>
+
 <script src="app.js"></script>
 </body>
-</html> 
+</html>
