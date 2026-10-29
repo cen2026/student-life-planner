@@ -8,17 +8,18 @@ const DEFAULT_CONFIG = {
         { name: "General", color: "#64748b", bg: "#f1f5f9" },
         { name: "Operating Systems", color: "#1d4ed8", bg: "#dbeafe" },
         { name: "Web Integration", color: "#7e22ce", bg: "#f3e8ff" }
-    ]
+    ],
+    weeklyTimetable: []
 };
 
-// 当前日历正在查看的月份
 let calDate = new Date();
+let activeLoggingClass = null;
 
 document.addEventListener("DOMContentLoaded", () => {
     loadSemesterConfig();
     populateCourseDropdowns();
+    renderStudyHub();
     renderAssignments();
-    renderStudyTasks();
     renderCalendar();
     renderExpenses();
 });
@@ -29,8 +30,8 @@ function switchTab(tabName) {
     document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
 
     const tabMap = {
-        'assignments': 0,
-        'study': 1,
+        'study-hub': 0,
+        'assignments': 1,
         'calendar': 2,
         'expenses': 3
     };
@@ -38,19 +39,23 @@ function switchTab(tabName) {
     document.querySelectorAll('.tab-btn')[tabMap[tabName]].classList.add('active');
     document.getElementById(`tab-${tabName}`).classList.add('active');
 
-    if (tabName === 'calendar') {
-        renderCalendar();
-    }
+    if (tabName === 'calendar') renderCalendar();
+    if (tabName === 'study-hub') renderStudyHub();
 }
 
-/* ================= ⚙️ 学期配置逻辑 ================= */
+function renderStudyHub() {
+    renderTodayClasses();
+    renderStudyDebts();
+    renderLectureNotes();
+}
+
+/* ================= ⚙️ 学期与课表配置 ================= */
 function getConfig() {
-    let cfg = localStorage.getItem("planner_semester_cfg_v1");
+    let cfg = localStorage.getItem("planner_semester_cfg_v2");
     return cfg ? JSON.parse(cfg) : DEFAULT_CONFIG;
 }
-
 function saveConfig(cfg) {
-    localStorage.setItem("planner_semester_cfg_v1", JSON.stringify(cfg));
+    localStorage.setItem("planner_semester_cfg_v2", JSON.stringify(cfg));
 }
 
 function loadSemesterConfig() {
@@ -74,9 +79,9 @@ function openSettings() {
     document.getElementById("cfgFinalDate").value = cfg.finalDate || "";
 
     renderConfigChips();
+    renderWeeklyRoutineList();
     document.getElementById("settingsModal").style.display = "flex";
 }
-
 function closeSettings() {
     document.getElementById("settingsModal").style.display = "none";
 }
@@ -126,6 +131,56 @@ function deleteCourseFromModal(idx) {
     populateCourseDropdowns();
 }
 
+function addWeeklyClass() {
+    const day = document.getElementById("ttDaySelect").value;
+    const course = document.getElementById("ttCourseSelect").value;
+    const time = document.getElementById("ttTimeInput").value.trim();
+    const room = document.getElementById("ttRoomInput").value.trim();
+
+    if (!course || !time) {
+        alert("Please select a course and enter time!");
+        return;
+    }
+
+    const cfg = getConfig();
+    if (!cfg.weeklyTimetable) cfg.weeklyTimetable = [];
+    cfg.weeklyTimetable.push({
+        id: "tt_" + Date.now(),
+        day, course, time, room
+    });
+
+    saveConfig(cfg);
+    document.getElementById("ttTimeInput").value = "";
+    document.getElementById("ttRoomInput").value = "";
+    renderWeeklyRoutineList();
+    renderTodayClasses();
+}
+
+function deleteWeeklyClass(idx) {
+    const cfg = getConfig();
+    cfg.weeklyTimetable.splice(idx, 1);
+    saveConfig(cfg);
+    renderWeeklyRoutineList();
+    renderTodayClasses();
+}
+
+function renderWeeklyRoutineList() {
+    const cfg = getConfig();
+    const container = document.getElementById("weeklyClassList");
+    container.innerHTML = "";
+    const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+    (cfg.weeklyTimetable || []).forEach((c, idx) => {
+        const item = document.createElement("div");
+        item.className = "routine-item";
+        item.innerHTML = `
+            <span><strong>${dayNames[c.day]}</strong> | ${c.course} (${c.time}${c.room ? ' - ' + c.room : ''})</span>
+            <span class="chip-del" onclick="deleteWeeklyClass(${idx})">&times;</span>
+        `;
+        container.appendChild(item);
+    });
+}
+
 function saveSemesterSettings() {
     const cfg = getConfig();
     cfg.semesterName = document.getElementById("cfgSemName").value.trim();
@@ -137,43 +192,397 @@ function saveSemesterSettings() {
     saveConfig(cfg);
     loadSemesterConfig();
     closeSettings();
+    populateCourseDropdowns();
+    renderStudyHub();
     renderAssignments();
-    renderStudyTasks();
     renderCalendar();
 }
 
 function populateCourseDropdowns() {
     const cfg = getConfig();
-    const assignSelect = document.getElementById("assignSubjectSelect");
-    const studySelect = document.getElementById("studySubjectSelect");
-    const assignFilter = document.getElementById("assignFilterSelect");
-    const studyFilter = document.getElementById("studyFilterSelect");
+    const selects = ["assignSubjectSelect", "replaceCourseSelect", "ttCourseSelect", "manualDebtSubjectSelect"];
 
-    assignSelect.innerHTML = "";
-    studySelect.innerHTML = "";
-    assignFilter.innerHTML = '<option value="ALL">All Courses</option>';
-    studyFilter.innerHTML = '<option value="ALL">All Courses</option>';
+    selects.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.innerHTML = "";
+            cfg.courses.forEach(c => {
+                const opt = document.createElement("option");
+                opt.value = c.name;
+                opt.textContent = c.name;
+                el.appendChild(opt);
+            });
+        }
+    });
 
-    cfg.courses.forEach(c => {
-        const opt1 = document.createElement("option");
-        opt1.value = c.name;
-        opt1.textContent = c.name;
-        assignSelect.appendChild(opt1);
+    const filterSelects = ["assignFilterSelect", "notesFilterSelect"];
+    filterSelects.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.innerHTML = '<option value="ALL">All Subjects</option>';
+            cfg.courses.forEach(c => {
+                const opt = document.createElement("option");
+                opt.value = c.name;
+                opt.textContent = c.name;
+                el.appendChild(opt);
+            });
+        }
+    });
+}
 
-        const opt2 = document.createElement("option");
-        opt2.value = c.name;
-        opt2.textContent = c.name;
-        studySelect.appendChild(opt2);
+/* ================= 1. 今日课程与灵活调整 ================= */
+function getOverrides() {
+    let ov = localStorage.getItem("planner_class_overrides");
+    return ov ? JSON.parse(ov) : { cancelled: [], replacements: [] };
+}
+function saveOverrides(ov) {
+    localStorage.setItem("planner_class_overrides", JSON.stringify(ov));
+}
 
-        const fOpt1 = document.createElement("option");
-        fOpt1.value = c.name;
-        fOpt1.textContent = c.name;
-        assignFilter.appendChild(fOpt1);
+function renderTodayClasses() {
+    const list = document.getElementById("todayClassesList");
+    list.innerHTML = "";
+    const cfg = getConfig();
+    const ov = getOverrides();
 
-        const fOpt2 = document.createElement("option");
-        fOpt2.value = c.name;
-        fOpt2.textContent = c.name;
-        studyFilter.appendChild(fOpt2);
+    const today = new Date();
+    const dayOfWeek = String(today.getDay());
+    const todayStr = today.toISOString().split('T')[0];
+
+    const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    document.getElementById("todayHeading").textContent = `Today's Classes (${dayNames[today.getDay()]}, ${todayStr})`;
+
+    const regularClasses = (cfg.weeklyTimetable || []).filter(c => c.day === dayOfWeek);
+    const todaysReplacements = (ov.replacements || []).filter(r => r.date === todayStr);
+
+    if (regularClasses.length === 0 && todaysReplacements.length === 0) {
+        list.innerHTML = '<div style="font-size:12px; color:#64748b; padding:8px 0;">🎉 No classes scheduled for today! Great time to clear study debts.</div>';
+        return;
+    }
+
+    regularClasses.forEach(c => {
+        const isCancelled = (ov.cancelled || []).includes(`${todayStr}_${c.id}`);
+        const card = document.createElement("div");
+        card.className = `class-card ${isCancelled ? 'cancelled' : ''}`;
+        const matchedCourse = cfg.courses.find(x => x.name === c.course) || { color: "#64748b", bg: "#f1f5f9" };
+
+        card.innerHTML = `
+            <div class="class-details">
+                <div class="class-title">${c.course} ${isCancelled ? '<span style="color:#ef4444; font-size:11px;">(Cancelled)</span>' : ''}</div>
+                <div class="class-meta">
+                    <span class="tag-badge" style="background:${matchedCourse.bg}; color:${matchedCourse.color};">${c.time}</span>
+                    <span>📍 ${c.room || 'TBA'}</span>
+                </div>
+            </div>
+            <div class="class-actions">
+                ${!isCancelled ? `<button class="btn-sm" onclick="openNoteModal('${c.course}')">📝 Log Takeaway</button>` : ''}
+                <button class="btn-sm btn-cancel" onclick="toggleCancelClass('${todayStr}_${c.id}')">
+                    ${isCancelled ? 'Restore' : 'Cancel'}
+                </button>
+            </div>
+        `;
+        list.appendChild(card);
+    });
+
+    todaysReplacements.forEach((r, idx) => {
+        const card = document.createElement("div");
+        card.className = "class-card replacement";
+        const matchedCourse = cfg.courses.find(x => x.name === r.course) || { color: "#64748b", bg: "#f1f5f9" };
+
+        card.innerHTML = `
+            <div class="class-details">
+                <div class="class-title">⚡ [Replacement] ${r.course}</div>
+                <div class="class-meta">
+                    <span class="tag-badge" style="background:${matchedCourse.bg}; color:${matchedCourse.color};">${r.time}</span>
+                    <span>📍 ${r.room || 'TBA'}</span>
+                </div>
+            </div>
+            <div class="class-actions">
+                <button class="btn-sm" onclick="openNoteModal('${r.course}')">📝 Log Takeaway</button>
+                <button class="btn-sm btn-cancel" onclick="deleteReplacement(${idx})">&times;</button>
+            </div>
+        `;
+        list.appendChild(card);
+    });
+}
+
+function toggleCancelClass(cancelKey) {
+    const ov = getOverrides();
+    if (!ov.cancelled) ov.cancelled = [];
+    if (ov.cancelled.includes(cancelKey)) {
+        ov.cancelled = ov.cancelled.filter(k => k !== cancelKey);
+    } else {
+        ov.cancelled.push(cancelKey);
+    }
+    saveOverrides(ov);
+    renderTodayClasses();
+}
+
+function openReplacementModal() {
+    const todayStr = new Date().toISOString().split('T')[0];
+    document.getElementById("replaceDateInput").value = todayStr;
+    document.getElementById("replacementModal").style.display = "flex";
+}
+function closeReplacementModal() {
+    document.getElementById("replacementModal").style.display = "none";
+}
+function saveReplacementClass() {
+    const course = document.getElementById("replaceCourseSelect").value;
+    const date = document.getElementById("replaceDateInput").value;
+    const time = document.getElementById("replaceTimeInput").value.trim();
+    const room = document.getElementById("replaceRoomInput").value.trim();
+
+    if (!date || !time) {
+        alert("Please fill in date and time!");
+        return;
+    }
+    const ov = getOverrides();
+    if (!ov.replacements) ov.replacements = [];
+    ov.replacements.push({ course, date, time, room });
+    saveOverrides(ov);
+
+    document.getElementById("replaceTimeInput").value = "";
+    document.getElementById("replaceRoomInput").value = "";
+    closeReplacementModal();
+    renderTodayClasses();
+}
+function deleteReplacement(idx) {
+    const ov = getOverrides();
+    ov.replacements.splice(idx, 1);
+    saveOverrides(ov);
+    renderTodayClasses();
+}
+
+/* ================= 2. 课堂笔记与课后债务核心联动 ================= */
+function getLectureNotes() {
+    let notes = localStorage.getItem("planner_lecture_notes_v2");
+    return notes ? JSON.parse(notes) : [];
+}
+function saveLectureNotes(notes) {
+    localStorage.setItem("planner_lecture_notes_v2", JSON.stringify(notes));
+}
+
+function calculateDaysDiff(startDateStr, endDateStr) {
+    if (!startDateStr || !endDateStr) return 0;
+    const start = new Date(startDateStr);
+    const end = new Date(endDateStr);
+    return Math.floor((end - start) / (1000 * 60 * 60 * 24));
+}
+
+function openNoteModal(courseName) {
+    activeLoggingClass = courseName;
+    document.getElementById("logNoteModalTitle").textContent = `📝 Log Takeaway: ${courseName}`;
+    document.getElementById("noteTopicInput").value = "";
+    document.getElementById("noteContentInput").value = "";
+    document.getElementById("noteCreateDebtCheckbox").checked = false;
+    document.getElementById("logNoteModal").style.display = "flex";
+}
+function closeNoteModal() {
+    document.getElementById("logNoteModal").style.display = "none";
+    activeLoggingClass = null;
+}
+
+function saveLectureNote() {
+    const topic = document.getElementById("noteTopicInput").value.trim();
+    const content = document.getElementById("noteContentInput").value.trim();
+    const needsDebt = document.getElementById("noteCreateDebtCheckbox").checked;
+
+    if (!topic || !content) {
+        alert("Please enter a topic and takeaway notes!");
+        return;
+    }
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const notes = getLectureNotes();
+    notes.unshift({
+        id: "note_" + Date.now(),
+        course: activeLoggingClass,
+        date: todayStr,
+        topic,
+        content,
+        hasDebt: needsDebt,
+        debtResolved: false,
+        resolvedDate: null
+    });
+
+    saveLectureNotes(notes);
+    closeNoteModal();
+    renderStudyHub();
+}
+
+function toggleDebtResolved(noteId) {
+    const notes = getLectureNotes();
+    const target = notes.find(n => n.id === noteId);
+    if (target) {
+        target.debtResolved = !target.debtResolved;
+        target.resolvedDate = target.debtResolved ? new Date().toISOString().split('T')[0] : null;
+        saveLectureNotes(notes);
+        renderStudyHub();
+    }
+}
+
+function deleteLectureNote(idx) {
+    const notes = getLectureNotes();
+    notes.splice(idx, 1);
+    saveLectureNotes(notes);
+    renderStudyHub();
+}
+
+/* 手动录入额外债务 (Manual Debt) */
+function toggleManualDebtForm() {
+    const box = document.getElementById("manualDebtBox");
+    box.style.display = box.style.display === "none" ? "block" : "none";
+}
+
+function addManualStudyDebt() {
+    const text = document.getElementById("manualDebtInput").value.trim();
+    const course = document.getElementById("manualDebtSubjectSelect").value;
+    const date = document.getElementById("manualDebtDateInput").value;
+
+    if (!text) return;
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    const notes = getLectureNotes();
+    notes.unshift({
+        id: "note_" + Date.now(),
+        course,
+        date: date || todayStr,
+        topic: text,
+        content: "Manual study debt / assignment follow-up.",
+        hasDebt: true,
+        debtResolved: false,
+        resolvedDate: null
+    });
+
+    saveLectureNotes(notes);
+    document.getElementById("manualDebtInput").value = "";
+    document.getElementById("manualDebtDateInput").value = "";
+    toggleManualDebtForm();
+    renderStudyHub();
+}
+
+/* 渲染中部债务列表 (Active Debts) */
+function renderStudyDebts() {
+    const list = document.getElementById("studyDebtList");
+    list.innerHTML = "";
+    const notes = getLectureNotes();
+    const cfg = getConfig();
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    // 只筛选带有债务的条目
+    const debtItems = notes.filter(n => n.hasDebt);
+
+    if (debtItems.length === 0) {
+        list.innerHTML = '<li style="color:#64748b; font-size:12px; padding:10px;">✨ No pending study debts! You are all caught up.</li>';
+        return;
+    }
+
+    // 智能排序：未解决的排前，且拖延时间最久的置顶
+    debtItems.sort((a, b) => {
+        if (a.debtResolved !== b.debtResolved) return a.debtResolved ? 1 : -1;
+        const delayA = calculateDaysDiff(a.date, todayStr);
+        const delayB = calculateDaysDiff(b.date, todayStr);
+        return delayB - delayA;
+    });
+
+    debtItems.forEach(item => {
+        const li = document.createElement("li");
+        const delayDays = calculateDaysDiff(item.date, item.debtResolved ? (item.resolvedDate || todayStr) : todayStr);
+
+        if (!item.debtResolved && delayDays > 0) {
+            li.className = delayDays >= 4 ? "status-overdue" : "status-freeze";
+        }
+        if (item.debtResolved) li.classList.add("completed");
+
+        const leftDiv = document.createElement("div");
+        leftDiv.className = "task-left";
+
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.checked = item.debtResolved;
+        checkbox.onchange = () => toggleDebtResolved(item.id);
+
+        const infoDiv = document.createElement("div");
+        infoDiv.className = "task-info";
+
+        const title = document.createElement("div");
+        title.className = "task-title";
+        title.textContent = `${item.topic}`;
+
+        const meta = document.createElement("div");
+        meta.className = "task-meta";
+
+        const matchedCourse = cfg.courses.find(c => c.name === item.course) || { color: "#64748b", bg: "#f1f5f9" };
+        const tag = document.createElement("span");
+        tag.className = "tag-badge";
+        tag.style.color = matchedCourse.color;
+        tag.style.backgroundColor = matchedCourse.bg;
+        tag.textContent = item.course;
+        meta.appendChild(tag);
+
+        const dateBadge = document.createElement("span");
+        dateBadge.className = "date-badge";
+        dateBadge.textContent = `Occurred: ${item.date}`;
+        meta.appendChild(dateBadge);
+
+        const delayBadge = document.createElement("span");
+        if (item.debtResolved) {
+            delayBadge.className = "delay-badge delay-completed";
+            delayBadge.textContent = delayDays > 0 ? `✓ 迟了 ${delayDays} 天补完` : "✓ 准时补完";
+        } else {
+            if (delayDays > 0) {
+                delayBadge.className = `delay-badge ${delayDays >= 4 ? 'delay-severe' : 'delay-mild'}`;
+                delayBadge.textContent = `⏳ 拖欠了 ${delayDays} 天`;
+            } else {
+                delayBadge.className = "delay-badge delay-mild";
+                delayBadge.textContent = "⚡ 今天刚发生";
+            }
+        }
+        meta.appendChild(delayBadge);
+
+        infoDiv.appendChild(title);
+        infoDiv.appendChild(meta);
+        leftDiv.appendChild(checkbox);
+        leftDiv.appendChild(infoDiv);
+
+        li.appendChild(leftDiv);
+        list.appendChild(li);
+    });
+}
+
+/* 渲染底部知识点归档库 (Lecture Knowledge Base) */
+function renderLectureNotes() {
+    const list = document.getElementById("lectureNotesList");
+    list.innerHTML = "";
+    const notes = getLectureNotes();
+    const filter = document.getElementById("notesFilterSelect").value;
+    const cfg = getConfig();
+
+    if (notes.length === 0) {
+        list.innerHTML = '<li style="color:#64748b; font-size:12px; padding:10px;">📖 No lecture takeaways logged yet.</li>';
+        return;
+    }
+
+    notes.forEach((n, idx) => {
+        if (filter !== "ALL" && n.course !== filter) return;
+
+        const matchedCourse = cfg.courses.find(x => x.name === n.course) || { color: "#64748b", bg: "#f1f5f9" };
+        const li = document.createElement("li");
+        li.className = "note-item";
+        li.innerHTML = `
+            <div class="note-header">
+                <div>
+                    <span class="tag-badge" style="background:${matchedCourse.bg}; color:${matchedCourse.color};">${n.course}</span>
+                    <span class="note-title" style="margin-left:6px;">${n.topic}</span>
+                </div>
+                <div style="display:flex; align-items:center; gap:8px;">
+                    <span style="font-size:11px; color:#64748b;">${n.date}</span>
+                    <button class="delete-btn" onclick="deleteLectureNote(${idx})">&times;</button>
+                </div>
+            </div>
+            <div class="note-body">${n.content}</div>
+        `;
+        list.appendChild(li);
     });
 }
 
@@ -182,11 +591,9 @@ function getStoredAssignments() {
     let data = localStorage.getItem("planner_assign_v1");
     return data ? JSON.parse(data) : [];
 }
-
 function saveAssignments(data) {
     localStorage.setItem("planner_assign_v1", JSON.stringify(data));
 }
-
 function renderAssignments() {
     const list = document.getElementById("assignmentList");
     list.innerHTML = "";
@@ -298,176 +705,6 @@ function deleteAssignment(idx) {
     renderCalendar();
 }
 
-/* ================= 📚 Study Tasks (课业负债与拖延计算) ================= */
-function getStoredStudyTasks() {
-    let data = localStorage.getItem("planner_study_v2");
-    return data ? JSON.parse(data) : [];
-}
-
-function saveStudyTasks(data) {
-    localStorage.setItem("planner_study_v2", JSON.stringify(data));
-}
-
-// 计算两日期间隔天数 (YYYY-MM-DD)
-function calculateDaysDiff(startDateStr, endDateStr) {
-    if (!startDateStr || !endDateStr) return 0;
-    const start = new Date(startDateStr);
-    const end = new Date(endDateStr);
-    const diffTime = end - start;
-    return Math.floor(diffTime / (1000 * 60 * 60 * 24));
-}
-
-function renderStudyTasks() {
-    const list = document.getElementById("studyList");
-    list.innerHTML = "";
-    const items = getStoredStudyTasks();
-    const cfg = getConfig();
-    const filter = document.getElementById("studyFilterSelect").value;
-    const todayStr = new Date().toISOString().split('T')[0];
-
-    items.forEach((item, index) => {
-        if (filter !== "ALL" && item.subject !== filter) return;
-
-        const li = document.createElement("li");
-
-        // 计算拖延天数
-        let delayDays = 0;
-        let isDelayed = false;
-
-        if (item.originalDate) {
-            const compareDate = item.completed ? (item.completedDate || todayStr) : todayStr;
-            delayDays = calculateDaysDiff(item.originalDate, compareDate);
-            if (delayDays > 0) isDelayed = true;
-        }
-
-        if (!item.completed && isDelayed) {
-            li.className = delayDays >= 4 ? "status-overdue" : "status-freeze";
-        }
-        if (item.completed) li.classList.add("completed");
-
-        const leftDiv = document.createElement("div");
-        leftDiv.className = "task-left";
-
-        const checkbox = document.createElement("input");
-        checkbox.type = "checkbox";
-        checkbox.checked = item.completed;
-        checkbox.onchange = () => toggleStudyTask(index);
-
-        const infoDiv = document.createElement("div");
-        infoDiv.className = "task-info";
-
-        const title = document.createElement("div");
-        title.className = "task-title";
-        title.textContent = item.text;
-
-        const meta = document.createElement("div");
-        meta.className = "task-meta";
-
-        // 科目标签
-        const matchedCourse = cfg.courses.find(c => c.name === item.subject) || { color: "#64748b", bg: "#f1f5f9" };
-        const tag = document.createElement("span");
-        tag.className = "tag-badge";
-        tag.style.color = matchedCourse.color;
-        tag.style.backgroundColor = matchedCourse.bg;
-        tag.textContent = item.subject;
-        meta.appendChild(tag);
-
-        // 原上课日期
-        if (item.originalDate) {
-            const dateBadge = document.createElement("span");
-            dateBadge.className = "date-badge";
-            dateBadge.textContent = `Ended: ${item.originalDate}`;
-            meta.appendChild(dateBadge);
-        }
-
-        // 拖延天数徽章 (核心负债指标)
-        if (item.originalDate) {
-            const delayBadge = document.createElement("span");
-            if (item.completed) {
-                delayBadge.className = "delay-badge delay-completed";
-                delayBadge.textContent = delayDays > 0 ? `✓ 迟了 ${delayDays} 天补完` : "✓ 准时补完";
-            } else {
-                if (delayDays > 0) {
-                    delayBadge.className = `delay-badge ${delayDays >= 4 ? 'delay-severe' : 'delay-mild'}`;
-                    delayBadge.textContent = `⏳ 拖欠了 ${delayDays} 天`;
-                } else if (delayDays === 0) {
-                    delayBadge.className = "delay-badge delay-mild";
-                    delayBadge.textContent = "⚡ 今天刚结束";
-                } else {
-                    delayBadge.className = "delay-badge delay-completed";
-                    delayBadge.textContent = "未到期课程";
-                }
-            }
-            meta.appendChild(delayBadge);
-        }
-
-        infoDiv.appendChild(title);
-        infoDiv.appendChild(meta);
-        leftDiv.appendChild(checkbox);
-        leftDiv.appendChild(infoDiv);
-
-        const delBtn = document.createElement("button");
-        delBtn.className = "delete-btn";
-        delBtn.innerHTML = "&times;";
-        delBtn.onclick = () => deleteStudyTask(index);
-
-        li.appendChild(leftDiv);
-        li.appendChild(delBtn);
-        list.appendChild(li);
-    });
-}
-
-function addStudyTask() {
-    const input = document.getElementById("studyTaskInput");
-    const subject = document.getElementById("studySubjectSelect").value;
-    const originalDate = document.getElementById("studyOriginalDate").value;
-
-    const text = input.value.trim();
-    if (!text) return;
-
-    const items = getStoredStudyTasks();
-    items.push({
-        text,
-        subject,
-        originalDate,
-        completed: false,
-        completedDate: null
-    });
-
-    // 智能排序：优先把未完成且拖延最久的排在最前面
-    const todayStr = new Date().toISOString().split('T')[0];
-    items.sort((a, b) => {
-        if (a.completed !== b.completed) return a.completed ? 1 : -1;
-        const delayA = a.originalDate ? calculateDaysDiff(a.originalDate, todayStr) : -999;
-        const delayB = b.originalDate ? calculateDaysDiff(b.originalDate, todayStr) : -999;
-        return delayB - delayA; // 拖延天数多的置顶
-    });
-
-    saveStudyTasks(items);
-    input.value = "";
-    document.getElementById("studyOriginalDate").value = "";
-    renderStudyTasks();
-    if (typeof renderCalendar === "function") renderCalendar();
-}
-
-function toggleStudyTask(idx) {
-    const items = getStoredStudyTasks();
-    const todayStr = new Date().toISOString().split('T')[0];
-    items[idx].completed = !items[idx].completed;
-    items[idx].completedDate = items[idx].completed ? todayStr : null;
-    saveStudyTasks(items);
-    renderStudyTasks();
-    if (typeof renderCalendar === "function") renderCalendar();
-}
-
-function deleteStudyTask(idx) {
-    const items = getStoredStudyTasks();
-    items.splice(idx, 1);
-    saveStudyTasks(items);
-    renderStudyTasks();
-    if (typeof renderCalendar === "function") renderCalendar();
-}
-
 /* ================= 📅 日历渲染与 Google Calendar 导出 ================= */
 function changeMonth(delta) {
     calDate.setMonth(calDate.getMonth() + delta);
@@ -481,7 +718,6 @@ function renderCalendar() {
 
     const year = calDate.getFullYear();
     const month = calDate.getMonth();
-
     const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
     document.getElementById("calendarMonthYearDisplay").textContent = `${monthNames[month]} ${year}`;
 
@@ -489,12 +725,9 @@ function renderCalendar() {
     const totalDays = new Date(year, month + 1, 0).getDate();
     const todayStr = new Date().toISOString().split('T')[0];
 
-    // 聚合所有事件
     const cfg = getConfig();
     const assigns = getStoredAssignments();
-    const studyTasks = getStoredStudyTasks();
-
-    const eventMap = {}; // 'YYYY-MM-DD' => [{ text, type }]
+    const eventMap = {}; // 空字典，用于按日期聚集事件
 
     const addEvent = (dStr, text, type) => {
         if (!dStr) return;
@@ -512,22 +745,15 @@ function renderCalendar() {
         }
     });
 
-    studyTasks.forEach(s => {
-        if (!s.completed && s.date) addEvent(s.date, `📚 ${s.text}`, "freeze");
-    });
-
-    // 填补前置空白格
     for (let i = 0; i < firstDayIndex; i++) {
-        const emptyCell = document.createElement("div");
-        emptyCell.className = "cal-day empty";
-        grid.appendChild(emptyCell);
+        const cell = document.createElement("div");
+        cell.className = "cal-day empty";
+        grid.appendChild(cell);
     }
 
-    // 渲染每一天
     for (let day = 1; day <= totalDays; day++) {
         const cell = document.createElement("div");
         cell.className = "cal-day";
-
         const mStr = String(month + 1).padStart(2, '0');
         const dStr = String(day).padStart(2, '0');
         const currDateStr = `${year}-${mStr}-${dStr}`;
@@ -557,29 +783,17 @@ function renderCalendar() {
     }
 }
 
-// 导出为标准 iCalendar (.ics) 文件，供 Google Calendar 直接导入
 function exportToICS() {
     const cfg = getConfig();
     const assigns = getStoredAssignments();
 
-    let icsContent = [
-        "BEGIN:VCALENDAR",
-        "VERSION:2.0",
-        "PRODID:-//Academic Sprint Planner//EN"
-    ];
-
+    let icsContent = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Academic Sprint Planner//EN"];
     const formatDateICS = (dStr) => dStr.replace(/-/g, "") + "T090000Z";
 
     const addVEvent = (title, dStr, desc) => {
         if (!dStr) return;
         const dt = formatDateICS(dStr);
-        icsContent.push("BEGIN:VEVENT");
-        icsContent.push(`SUMMARY:${title}`);
-        icsContent.push(`DESCRIPTION:${desc}`);
-        icsContent.push(`DTSTART:${dt}`);
-        icsContent.push(`DTEND:${dt}`);
-        icsContent.push("STATUS:CONFIRMED");
-        icsContent.push("END:VEVENT");
+        icsContent.push("BEGIN:VEVENT", `SUMMARY:${title}`, `DESCRIPTION:${desc}`, `DTSTART:${dt}`, `DTEND:${dt}`, "STATUS:CONFIRMED", "END:VEVENT");
     };
 
     if (cfg.midtermDate) addVEvent("Midterm Exam Week", cfg.midtermDate, "Midterm examination week starts.");
@@ -613,6 +827,7 @@ function saveExpenses(expenses) {
 
 function renderExpenses() {
     const list = document.getElementById("expenseList");
+    if (!list) return;
     list.innerHTML = "";
     const expenses = getStoredExpenses();
     let total = 0;
@@ -662,7 +877,8 @@ function renderExpenses() {
         list.appendChild(li);
     });
 
-    document.getElementById("totalExpenseDisplay").textContent = `Total Spent: RM ${total.toFixed(2)}`;
+    const display = document.getElementById("totalExpenseDisplay");
+    if (display) display.textContent = `Total Spent: RM ${total.toFixed(2)}`;
 }
 
 function addExpense() {

@@ -98,30 +98,97 @@ body {
 .tab-content { display: none; }
 .tab-content.active { display: block; }
 
-/* 表单组件 */
+/* 区域小标题与紧凑筛选栏 */
+.section-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+.section-header h3 {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text-main);
+    margin: 0;
+    white-space: nowrap;
+}
+.section-header select {
+    width: auto;
+    max-width: 140px;
+    padding: 5px 8px;
+    font-size: 12px;
+}
+
+/* 课程卡片 */
+.class-card-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+.class-card {
+    background: #ffffff;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 10px 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+}
+.class-card.cancelled {
+    background-color: #f8fafc;
+    border-style: dashed;
+    opacity: 0.6;
+}
+.class-card.cancelled .class-title {
+    text-decoration: line-through;
+    color: var(--text-muted);
+}
+.class-card.replacement { border-left: 4px solid var(--warning); }
+
+.class-details {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+.class-title { font-size: 13px; font-weight: 600; }
+.class-meta {
+    font-size: 11px;
+    color: var(--text-muted);
+    display: flex;
+    gap: 6px;
+    align-items: center;
+}
+
+.class-actions { display: flex; gap: 6px; align-items: center; }
+.btn-sm {
+    padding: 4px 8px;
+    font-size: 11px;
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+    background: #ffffff;
+    cursor: pointer;
+    font-weight: 600;
+}
+.btn-sm:hover { background: #f1f5f9; }
+.btn-cancel { color: var(--danger); border-color: #fecaca; }
+.btn-cancel:hover { background: #fee2e2; }
+
+/* 表单与输入组件 */
 .input-form {
     display: flex;
     flex-direction: column;
     gap: 12px;
     margin-bottom: 20px;
 }
-
 .input-row { display: flex; gap: 10px; }
 .flex-1 { flex: 1; }
 
-.date-group {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
+.date-group { display: flex; flex-direction: column; gap: 4px; }
+.date-group label { font-size: 11px; font-weight: 600; color: var(--text-muted); }
 
-.date-group label {
-    font-size: 11px;
-    font-weight: 600;
-    color: var(--text-muted);
-}
-
-input, select {
+input, select, textarea {
     width: 100%;
     padding: 9px 12px;
     border: 1.5px solid var(--border-color);
@@ -130,9 +197,9 @@ input, select {
     color: var(--text-main);
     background-color: #fff;
     outline: none;
+    font-family: inherit;
 }
-
-input:focus, select:focus {
+input:focus, select:focus, textarea:focus {
     border-color: var(--primary);
     box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
 }
@@ -150,13 +217,13 @@ button.action-btn {
 button.action-btn:hover { background-color: var(--primary-hover); }
 
 button.secondary-btn {
-    padding: 8px 14px;
+    padding: 6px 12px;
     background: #e0e7ff;
     color: var(--primary);
     border: none;
     border-radius: 8px;
     cursor: pointer;
-    font-size: 13px;
+    font-size: 12px;
     font-weight: 600;
     white-space: nowrap;
 }
@@ -169,9 +236,9 @@ button.secondary-btn {
     font-size: 13px;
     color: var(--text-muted);
 }
-.filter-row select { width: auto; }
+.filter-row select { width: auto; max-width: 160px; }
 
-/* 任务列表 */
+/* 任务与负债列表项 */
 ul { list-style: none; }
 
 li {
@@ -182,7 +249,7 @@ li {
     border: 1px solid var(--border-color);
     padding: 12px 14px;
     border-radius: 8px;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
     box-shadow: 0 1px 2px rgba(0,0,0,0.04);
 }
 
@@ -202,24 +269,15 @@ li.status-overdue {
 }
 
 input[type="checkbox"] {
-    width: 18px;
-    height: 18px;
+    width: 17px;
+    height: 17px;
     margin-top: 2px;
     accent-color: var(--primary);
     cursor: pointer;
 }
 
-.task-info {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-
-.task-title {
-    font-size: 14px;
-    font-weight: 600;
-}
-
+.task-info { display: flex; flex-direction: column; gap: 4px; }
+.task-title { font-size: 14px; font-weight: 600; }
 .task-meta {
     font-size: 11px;
     color: var(--text-muted);
@@ -230,7 +288,7 @@ input[type="checkbox"] {
 }
 
 .tag-badge {
-    padding: 2px 8px;
+    padding: 2px 7px;
     border-radius: 4px;
     font-weight: 600;
     font-size: 11px;
@@ -254,141 +312,48 @@ input[type="checkbox"] {
 
 .completed .task-title { text-decoration: line-through; color: #94a3b8; }
 
-/* ================= 📅 日历网格专属样式 ================= */
-.calendar-header {
+/* 拖延天数警示 */
+.delay-badge {
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 700;
+}
+.delay-mild { background-color: #fef3c7; color: #b45309; }
+.delay-severe { background-color: #fee2e2; color: #b91c1c; }
+.delay-completed { background-color: #f1f5f9; color: #64748b; font-weight: normal; }
+
+/* 课堂笔记条目 */
+.note-item {
+    background: #ffffff;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    display: block;
+}
+.note-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 14px;
-}
-.calendar-header h3 {
-    font-size: 16px;
-    color: var(--text-main);
-    margin: 0;
-}
-.cal-nav-btn {
-    background: #f1f5f9;
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    padding: 4px 12px;
-    cursor: pointer;
-    font-weight: bold;
-}
-.cal-nav-btn:hover { background: #e2e8f0; }
-
-.calendar-weekdays {
-    display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    text-align: center;
-    font-size: 11px;
-    font-weight: 700;
-    color: var(--text-muted);
     margin-bottom: 6px;
 }
-
-.calendar-grid {
-    display: grid;
-    grid-template-columns: repeat(7, 1fr);
-    gap: 4px;
-    margin-bottom: 20px;
-}
-
-.cal-day {
-    min-height: 64px;
-    background: #ffffff;
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    padding: 4px;
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-start;
-    font-size: 11px;
-    transition: all 0.15s ease;
-}
-.cal-day.empty {
-    background: #f8fafc;
-    border: 1px dashed #f1f5f9;
-}
-.cal-day.today {
-    border-color: var(--primary);
-    background-color: #f5f3ff;
-}
-.cal-day-num {
-    font-weight: 700;
-    color: var(--text-main);
-    margin-bottom: 2px;
-}
-.cal-events {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    overflow: hidden;
-}
-.cal-event-pill {
-    font-size: 9px;
-    padding: 1px 3px;
-    border-radius: 3px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    font-weight: 600;
-    cursor: default;
-}
-
-.cal-pill-freeze { background: #fef3c7; color: #b45309; }
-.cal-pill-hard { background: #fee2e2; color: #b91c1c; }
-.cal-pill-exam { background: #e0e7ff; color: #3730a3; }
-
-.calendar-actions {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    margin-top: 10px;
-}
-.cal-tip {
+.note-title { font-size: 13px; font-weight: 600; color: var(--text-main); }
+.note-body {
     font-size: 12px;
-    color: var(--text-muted);
-    line-height: 1.4;
-    margin: 0;
+    color: #334155;
+    line-height: 1.5;
+    background: #f8fafc;
+    padding: 6px 8px;
+    border-radius: 6px;
+    white-space: pre-wrap;
 }
 
-/* 记账总计 */
-.expense-total {
-    background: linear-gradient(135deg, #059669, #10b981);
-    color: #ffffff;
-    padding: 14px;
-    border-radius: 8px;
-    text-align: center;
-    font-size: 16px;
-    font-weight: 700;
-    margin-bottom: 16px;
-}
-
-.expense-amount {
-    font-weight: 700;
-    color: var(--danger);
-    font-size: 14px;
-    margin-right: 10px;
-}
-
-.delete-btn {
-    background: transparent;
-    color: #cbd5e1;
-    border: none;
-    font-size: 18px;
-    cursor: pointer;
-    padding: 2px 6px;
-    border-radius: 4px;
-}
-.delete-btn:hover { color: var(--danger); background-color: var(--danger-bg); }
-
-/* ⚙️ 弹窗样式 */
+/* 弹窗与设置 */
 .modal-overlay {
     position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
+    top: 0; left: 0;
+    width: 100vw; height: 100vh;
     background: rgba(15, 23, 42, 0.45);
     backdrop-filter: blur(4px);
     display: flex;
@@ -396,7 +361,6 @@ input[type="checkbox"] {
     align-items: center;
     z-index: 1000;
 }
-
 .modal-content {
     background: #ffffff;
     width: 90%;
@@ -406,7 +370,6 @@ input[type="checkbox"] {
     border: 1px solid var(--border-color);
     overflow: hidden;
 }
-
 .modal-header {
     display: flex;
     justify-content: space-between;
@@ -416,98 +379,91 @@ input[type="checkbox"] {
 }
 .modal-header h3 { font-size: 16px; margin: 0; }
 .close-btn {
-    background: none;
-    border: none;
-    font-size: 22px;
-    color: var(--text-muted);
-    cursor: pointer;
+    background: none; border: none; font-size: 22px;
+    color: var(--text-muted); cursor: pointer;
 }
-
 .modal-body {
-    padding: 20px;
-    max-height: 70vh;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 18px;
+    padding: 20px; max-height: 70vh; overflow-y: auto;
+    display: flex; flex-direction: column; gap: 16px;
 }
-
+.checkbox-container {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    background: #f8fafc;
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px dashed var(--border-color);
+}
 .config-section h4 {
-    font-size: 13px;
-    margin-bottom: 10px;
-    color: var(--primary);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
+    font-size: 13px; margin-bottom: 10px;
+    color: var(--primary); text-transform: uppercase;
+}
+.input-group-row { display: flex; flex-direction: column; gap: 4px; }
+.input-group-row label { font-size: 11px; font-weight: 600; color: var(--text-muted); }
+.modal-footer {
+    padding: 12px 20px; border-top: 1px solid var(--border-color);
+    background: #f8fafc; display: flex; justify-content: flex-end;
 }
 
-.input-group-row {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    margin-bottom: 10px;
-}
-.input-group-row label {
-    font-size: 11px;
-    font-weight: 600;
-    color: var(--text-muted);
-}
-
-.chip-container {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-    margin-top: 10px;
-}
+.chip-container { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .course-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 4px 10px;
-    border-radius: 20px;
-    font-size: 12px;
-    font-weight: 600;
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px; border-radius: 20px; font-size: 12px; font-weight: 600;
 }
 .chip-del { cursor: pointer; color: var(--text-muted); }
 .chip-del:hover { color: var(--danger); }
 
-.modal-footer {
-    padding: 12px 20px;
-    border-top: 1px solid var(--border-color);
-    background: #f8fafc;
-    display: flex;
-    justify-content: flex-end;
+.class-routine-list {
+    display: flex; flex-direction: column; gap: 6px;
+    margin-top: 10px; max-height: 140px; overflow-y: auto;
+}
+.routine-item {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12px; background: #f1f5f9; padding: 6px 10px; border-radius: 6px;
 }
 
-/* 课业负债与拖延天数徽章 */
-.delay-badge {
-    padding: 2px 7px;
-    border-radius: 4px;
-    font-size: 11px;
-    font-weight: 700;
+/* 日历样式 */
+.calendar-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+.calendar-header h3 { font-size: 16px; margin: 0; }
+.cal-nav-btn {
+    background: #f1f5f9; border: 1px solid var(--border-color);
+    border-radius: 6px; padding: 4px 12px; cursor: pointer; font-weight: bold;
 }
-
-/* 轻微拖延 (1-3天) */
-.delay-mild {
-    background-color: #fef3c7;
-    color: #b45309;
+.calendar-weekdays {
+    display: grid; grid-template-columns: repeat(7, 1fr);
+    text-align: center; font-size: 11px; font-weight: 700; color: var(--text-muted); margin-bottom: 6px;
 }
-
-/* 严重拖延 (4天以上) */
-.delay-severe {
-    background-color: #fee2e2;
-    color: #b91c1c;
-    animation: pulse 2s infinite;
+.calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 20px; }
+.cal-day {
+    min-height: 64px; background: #ffffff; border: 1px solid var(--border-color);
+    border-radius: 6px; padding: 4px; display: flex; flex-direction: column; font-size: 11px;
 }
-
-/* 已补完历史记录 */
-.delay-completed {
-    background-color: #f1f5f9;
-    color: #64748b;
-    font-weight: normal;
+.cal-day.empty { background: #f8fafc; border-style: dashed; }
+.cal-day.today { border-color: var(--primary); background-color: #f5f3ff; }
+.cal-day-num { font-weight: 700; margin-bottom: 2px; }
+.cal-events { display: flex; flex-direction: column; gap: 2px; overflow: hidden; }
+.cal-event-pill {
+    font-size: 9px; padding: 1px 3px; border-radius: 3px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-weight: 600;
 }
+.cal-pill-freeze { background: #fef3c7; color: #b45309; }
+.cal-pill-hard { background: #fee2e2; color: #b91c1c; }
+.cal-pill-exam { background: #e0e7ff; color: #3730a3; }
+.calendar-actions { display: flex; flex-direction: column; gap: 10px; }
 
-@keyframes pulse {
-    0% { opacity: 1; }
-    50% { opacity: 0.8; }
-    100% { opacity: 1; }
+/* 记账总计与删除 */
+.expense-total {
+    background: linear-gradient(135deg, #059669, #10b981); color: #ffffff;
+    padding: 14px; border-radius: 8px; text-align: center; font-size: 16px; font-weight: 700; margin-bottom: 16px;
+}
+.expense-amount { font-weight: 700; color: var(--danger); font-size: 14px; margin-right: 10px; }
+.delete-btn {
+    background: transparent; color: #cbd5e1; border: none;
+    font-size: 18px; cursor: pointer; padding: 2px 6px; border-radius: 4px;
+}
+.delete-btn:hover { color: var(--danger); background-color: var(--danger-bg); }
+.manager-box {
+    background: #f8fafc; border: 1px dashed var(--border-color);
+    border-radius: 8px; padding: 12px; margin-bottom: 14px;
 }

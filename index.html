@@ -18,16 +18,57 @@
         <button class="icon-btn" onclick="openSettings()" title="Semester & Course Settings">⚙️</button>
     </div>
 
-    <!-- 顶部 Tab 导航 -->
+    <!-- 顶部 Tab 导航（四大核心板块） -->
     <div class="tab-bar">
-        <button class="tab-btn active" onclick="switchTab('assignments')">🎯 Assignments</button>
-        <button class="tab-btn" onclick="switchTab('study')">📚 Study</button>
+        <button class="tab-btn active" onclick="switchTab('study-hub')">📚 Classes & Study</button>
+        <button class="tab-btn" onclick="switchTab('assignments')">🎯 Assignments</button>
         <button class="tab-btn" onclick="switchTab('calendar')">📅 Calendar</button>
         <button class="tab-btn" onclick="switchTab('expenses')">💰 Expenses</button>
     </div>
 
-    <!-- 面板 1：大作业/项目 (双死线) -->
-    <div id="tab-assignments" class="tab-content active">
+    <!-- ================= 面板 1：Classes & Study 综合工作台 ================= -->
+    <div id="tab-study-hub" class="tab-content active">
+        <!-- 1. 今日课程卡片区 -->
+        <div class="section-header">
+            <h3 id="todayHeading">Today's Classes</h3>
+            <button class="secondary-btn" onclick="openReplacementModal()">+ Add Replacement</button>
+        </div>
+        <div id="todayClassesList" class="class-card-list"></div>
+
+        <!-- 2. 待追赶课业负债区 (Active Study Debts) -->
+        <div class="section-header" style="margin-top: 22px;">
+            <h3>⏳ Active Study Debts</h3>
+            <button class="secondary-btn" onclick="toggleManualDebtForm()">+ Manual Debt</button>
+        </div>
+
+        <!-- 手动录入临时债务抽屉 (默认折叠) -->
+        <div id="manualDebtBox" class="manager-box" style="display: none;">
+            <div class="input-form" style="margin-bottom: 0;">
+                <input type="text" id="manualDebtInput" placeholder="Task description (e.g. Lab 4 Extra Exercise)...">
+                <div class="input-row">
+                    <select id="manualDebtSubjectSelect" class="flex-1"></select>
+                    <div class="date-group flex-1">
+                        <input type="date" id="manualDebtDateInput">
+                    </div>
+                </div>
+                <button class="action-btn" onclick="addManualStudyDebt()">Log Debt</button>
+            </div>
+        </div>
+
+        <ul id="studyDebtList" class="debt-list-container"></ul>
+
+        <!-- 3. 课堂要点知识库 (Lecture Knowledge Base) -->
+        <div class="section-header" style="margin-top: 26px;">
+            <h3>📖 Lecture Key Takeaways</h3>
+            <select id="notesFilterSelect" onchange="renderLectureNotes()">
+                <option value="ALL">All Subjects</option>
+            </select>
+        </div>
+        <ul id="lectureNotesList"></ul>
+    </div>
+
+    <!-- ================= 面板 2：🎯 Assignments (双死线) ================= -->
+    <div id="tab-assignments" class="tab-content">
         <div class="input-form">
             <input type="text" id="assignInput" placeholder="Assignment / Project Name...">
             <div class="input-row">
@@ -56,57 +97,25 @@
         <ul id="assignmentList"></ul>
     </div>
 
-    <!-- 面板 2：日常讲义与练习 -->
-    <div id="tab-study" class="tab-content">
-        <div class="input-form">
-            <input type="text" id="studyTaskInput" placeholder="e.g. Week 4 OS Lecture Recording, Lab 3...">
-            <div class="input-row">
-                <select id="studySubjectSelect" class="flex-1"></select>
-                <div class="date-group flex-1">
-                    <label for="studyOriginalDate">📅 Lecture Ended On (上课/原定日期):</label>
-                    <input type="date" id="studyOriginalDate">
-                </div>
-            </div>
-            <button class="action-btn" onclick="addStudyTask()">Log Lecture Debt / Task</button>
-        </div>
-
-        <div class="filter-row">
-            <span>Filter by Course:</span>
-            <select id="studyFilterSelect" onchange="renderStudyTasks()">
-                <option value="ALL">All Courses</option>
-            </select>
-        </div>
-
-        <ul id="studyList"></ul>
-    </div>
-
-    <!-- 面板 3：📅 学期日历与 Google Calendar 联动 -->
+    <!-- ================= 面板 3：📅 学期日历 ================= -->
     <div id="tab-calendar" class="tab-content">
         <div class="calendar-header">
             <button class="cal-nav-btn" onclick="changeMonth(-1)">&lt;</button>
             <h3 id="calendarMonthYearDisplay">Month Year</h3>
             <button class="cal-nav-btn" onclick="changeMonth(1)">&gt;</button>
         </div>
-
-        <!-- 星期表头 -->
         <div class="calendar-weekdays">
             <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
         </div>
-
-        <!-- 日历网格 -->
         <div id="calendarGrid" class="calendar-grid"></div>
-
-        <!-- Google Calendar 导出与说明 -->
         <div class="calendar-actions">
             <button class="action-btn" onclick="exportToICS()">📥 Export to Google Calendar (.ics)</button>
-            <p class="cal-tip">💡 Click to download an .ics file, then import it directly into Google Calendar to sync all deadlines and exam weeks to your phone!</p>
         </div>
     </div>
 
-    <!-- 面板 4：日用记账 -->
+    <!-- ================= 面板 4：💰 日用记账 ================= -->
     <div id="tab-expenses" class="tab-content">
         <div class="expense-total" id="totalExpenseDisplay">Total Spent: RM 0.00</div>
-
         <div class="input-form">
             <input type="text" id="expenseTitleInput" placeholder="Item (e.g. Lunch, Bus, Books)...">
             <div class="input-row">
@@ -120,8 +129,73 @@
             </div>
             <button class="action-btn" onclick="addExpense()">Record Expense</button>
         </div>
-
         <ul id="expenseList"></ul>
+    </div>
+</div>
+
+<!-- ================= 📝 记录课堂重点与课后债务弹窗 ================= -->
+<div id="logNoteModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="logNoteModalTitle">📝 Log Lecture Takeaway</h3>
+            <button class="close-btn" onclick="closeNoteModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="input-group-row">
+                <label>Topic / Concept:</label>
+                <input type="text" id="noteTopicInput" placeholder="e.g. Virtual Memory & Paging Algorithms">
+            </div>
+            <div class="input-group-row">
+                <label>Key Takeaways / Formulas / Summary:</label>
+                <textarea id="noteContentInput" rows="4" placeholder="What core concepts were covered?"></textarea>
+            </div>
+            <!-- 核心联动勾选框 -->
+            <div class="checkbox-container">
+                <input type="checkbox" id="noteCreateDebtCheckbox">
+                <label for="noteCreateDebtCheckbox">
+                    <strong>⚠️ Needs Follow-up / Create Study Debt</strong>
+                    <div style="font-size: 11px; color: var(--text-muted); font-weight: normal; margin-top: 2px;">
+                        Check this if you didn't fully understand or need to re-watch / complete lab exercises. Starts tracking delay days from today.
+                    </div>
+                </label>
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="action-btn" onclick="saveLectureNote()">Save & Sync</button>
+        </div>
+    </div>
+</div>
+
+<!-- ➕ 添加补课 (Replacement Class) 弹窗 -->
+<div id="replacementModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>⚡ Add Replacement / Extra Class</h3>
+            <button class="close-btn" onclick="closeReplacementModal()">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="input-group-row">
+                <label>Course:</label>
+                <select id="replaceCourseSelect"></select>
+            </div>
+            <div class="input-row">
+                <div class="date-group flex-1">
+                    <label>Date:</label>
+                    <input type="date" id="replaceDateInput">
+                </div>
+                <div class="date-group flex-1">
+                    <label>Time:</label>
+                    <input type="text" id="replaceTimeInput" placeholder="e.g. 10:00 - 12:00">
+                </div>
+            </div>
+            <div class="input-group-row">
+                <label>Room / Link:</label>
+                <input type="text" id="replaceRoomInput" placeholder="e.g. Lab 4 or Teams Link">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="action-btn" onclick="saveReplacementClass()">Add Class</button>
+        </div>
     </div>
 </div>
 
@@ -152,23 +226,45 @@
                 </div>
                 <div class="input-row">
                     <div class="date-group flex-1">
-                        <label>Midterm Exam Week Start:</label>
+                        <label>Midterm Start:</label>
                         <input type="date" id="cfgMidtermDate">
                     </div>
                     <div class="date-group flex-1">
-                        <label>Final Exam Week Start:</label>
+                        <label>Final Exam Start:</label>
                         <input type="date" id="cfgFinalDate">
                     </div>
                 </div>
             </div>
 
             <div class="config-section">
-                <h4>Courses for this Semester</h4>
+                <h4>Courses</h4>
                 <div class="input-row">
-                    <input type="text" id="cfgCourseInput" placeholder="Course title (e.g. Operating Systems)...">
+                    <input type="text" id="cfgCourseInput" placeholder="Course title...">
                     <button class="secondary-btn" onclick="addCourseFromModal()">+ Add</button>
                 </div>
                 <div id="cfgCourseChips" class="chip-container"></div>
+            </div>
+
+            <div class="config-section">
+                <h4>Weekly Timetable (Weekly Routine)</h4>
+                <div class="input-row">
+                    <select id="ttDaySelect" class="flex-1">
+                        <option value="1">Monday</option>
+                        <option value="2">Tuesday</option>
+                        <option value="3">Wednesday</option>
+                        <option value="4">Thursday</option>
+                        <option value="5">Friday</option>
+                        <option value="6">Saturday</option>
+                        <option value="0">Sunday</option>
+                    </select>
+                    <select id="ttCourseSelect" class="flex-1"></select>
+                </div>
+                <div class="input-row">
+                    <input type="text" id="ttTimeInput" placeholder="Time (e.g. 09:00 - 11:00)" class="flex-1">
+                    <input type="text" id="ttRoomInput" placeholder="Room (e.g. Block A 302)" class="flex-1">
+                    <button class="secondary-btn" onclick="addWeeklyClass()">Add Class</button>
+                </div>
+                <div id="weeklyClassList" class="class-routine-list"></div>
             </div>
         </div>
 
