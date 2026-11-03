@@ -12,8 +12,20 @@ const DEFAULT_CONFIG = {
     weeklyTimetable: []
 };
 
+// ================= 全局状态管理变量 =================
 let calDate = new Date();
+let currentBaseWeekDate = new Date();
+let selectedDateStr = getLocalDateString(new Date());
 let activeLoggingClass = null;
+let activeLoggingDate = null;
+let editingWeeklyClassIndex = null; // 必须是全局变量，null 表示当前处于新增模式
+
+function getLocalDateString(d) {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
 
 document.addEventListener("DOMContentLoaded", () => {
     loadSemesterConfig();
@@ -44,7 +56,10 @@ function switchTab(tabName) {
 }
 
 function renderStudyHub() {
-    renderTodayClasses();
+    renderWeeklyBoard();
+    if (selectedDateStr) {
+        renderSelectedDayClasses();
+    }
     renderStudyDebts();
     renderLectureNotes();
 }
@@ -82,7 +97,9 @@ function openSettings() {
     renderWeeklyRoutineList();
     document.getElementById("settingsModal").style.display = "flex";
 }
+
 function closeSettings() {
+    cancelEditWeeklyClass();
     document.getElementById("settingsModal").style.display = "none";
 }
 
@@ -131,29 +148,56 @@ function deleteCourseFromModal(idx) {
     populateCourseDropdowns();
 }
 
-function addWeeklyClass() {
+/* ================= 课表排课添加与编辑更新 ================= */
+function submitWeeklyClass() {
     const day = document.getElementById("ttDaySelect").value;
     const course = document.getElementById("ttCourseSelect").value;
-    const time = document.getElementById("ttTimeInput").value.trim();
-    const room = document.getElementById("ttRoomInput").value.trim();
+    const type = document.getElementById("ttTypeSelect").value;
+    const startTime = document.getElementById("ttStartTimeInput").value;
+    const endTime = document.getElementById("ttEndTimeInput").value;
 
-    if (!course || !time) {
-        alert("Please select a course and enter time!");
+    if (!course || !startTime || !endTime) {
+        alert("Please select a course, start time, and end time!");
         return;
     }
 
+    if (startTime >= endTime) {
+        alert("End time must be later than start time!");
+        return;
+    }
+
+    const timeRange = `${startTime} - ${endTime}`;
     const cfg = getConfig();
     if (!cfg.weeklyTimetable) cfg.weeklyTimetable = [];
-    cfg.weeklyTimetable.push({
-        id: "tt_" + Date.now(),
-        day, course, time, room
-    });
+
+    if (editingWeeklyClassIndex !== null) {
+        // 编辑更新分支
+        const existingId = cfg.weeklyTimetable[editingWeeklyClassIndex].id || ("tt_" + Date.now());
+        cfg.weeklyTimetable[editingWeeklyClassIndex] = {
+            id: existingId,
+            day,
+            course,
+            type: type || "Lecture",
+            time: timeRange
+        };
+    } else {
+        // 全新添加分支
+        cfg.weeklyTimetable.push({
+            id: "tt_" + Date.now(),
+            day,
+            course,
+            type: type || "Lecture",
+            time: timeRange
+        });
+    }
+
+    // 重新按开始时间排序
+    cfg.weeklyTimetable.sort((a, b) => (a.time || '').localeCompare(b.time || ''));
 
     saveConfig(cfg);
-    document.getElementById("ttTimeInput").value = "";
-    document.getElementById("ttRoomInput").value = "";
+    cancelEditWeeklyClass(); // 重置输入框与按钮状态
     renderWeeklyRoutineList();
-    renderTodayClasses();
+    renderStudyHub();
 }
 
 function deleteWeeklyClass(idx) {
@@ -161,12 +205,13 @@ function deleteWeeklyClass(idx) {
     cfg.weeklyTimetable.splice(idx, 1);
     saveConfig(cfg);
     renderWeeklyRoutineList();
-    renderTodayClasses();
+    renderStudyHub();
 }
 
 function renderWeeklyRoutineList() {
     const cfg = getConfig();
     const container = document.getElementById("weeklyClassList");
+    if (!container) return;
     container.innerHTML = "";
     const dayNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -174,11 +219,61 @@ function renderWeeklyRoutineList() {
         const item = document.createElement("div");
         item.className = "routine-item";
         item.innerHTML = `
-            <span><strong>${dayNames[c.day]}</strong> | ${c.course} (${c.time}${c.room ? ' - ' + c.room : ''})</span>
-            <span class="chip-del" onclick="deleteWeeklyClass(${idx})">&times;</span>
+            <span><strong>${dayNames[c.day]}</strong> | ${c.course} <span style="color:var(--primary); font-weight:600;">[${c.type || 'Lecture'}]</span> <span style="color:#64748b;">(${c.time})</span></span>
+            <div style="display: flex; gap: 6px; align-items: center;">
+                <button class="icon-btn" onclick="startEditWeeklyClass(${idx})" style="padding: 2px 6px; font-size: 12px; border:none; background:transparent; cursor:pointer;" title="Edit this class">✏️</button>
+                <span class="chip-del" onclick="deleteWeeklyClass(${idx})">&times;</span>
+            </div>
         `;
         container.appendChild(item);
     });
+}
+
+function startEditWeeklyClass(idx) {
+    const cfg = getConfig();
+    const target = cfg.weeklyTimetable[idx];
+    if (!target) return;
+
+    editingWeeklyClassIndex = idx;
+
+    // 回填输入框
+    document.getElementById("ttDaySelect").value = target.day;
+    document.getElementById("ttCourseSelect").value = target.course;
+    document.getElementById("ttTypeSelect").value = target.type || "Lecture";
+
+    const times = (target.time || "").split("-").map(t => t.trim());
+    document.getElementById("ttStartTimeInput").value = times[0] || "";
+    document.getElementById("ttEndTimeInput").value = times[1] || "";
+
+    // 切换按钮外观
+    const submitBtn = document.getElementById("ttSubmitBtn");
+    const cancelBtn = document.getElementById("ttCancelEditBtn");
+    if (submitBtn) {
+        submitBtn.textContent = "Update Class";
+        submitBtn.style.backgroundColor = "var(--primary)";
+        submitBtn.style.color = "#ffffff";
+    }
+    if (cancelBtn) {
+        cancelBtn.style.display = "inline-block";
+    }
+}
+
+function cancelEditWeeklyClass() {
+    editingWeeklyClassIndex = null;
+
+    document.getElementById("ttStartTimeInput").value = "";
+    document.getElementById("ttEndTimeInput").value = "";
+
+    const submitBtn = document.getElementById("ttSubmitBtn");
+    const cancelBtn = document.getElementById("ttCancelEditBtn");
+    if (submitBtn) {
+        submitBtn.textContent = "Add Class";
+        submitBtn.style.backgroundColor = "";
+        submitBtn.style.color = "";
+    }
+    if (cancelBtn) {
+        cancelBtn.style.display = "none";
+    }
 }
 
 function saveSemesterSettings() {
@@ -230,7 +325,25 @@ function populateCourseDropdowns() {
     });
 }
 
-/* ================= 1. 今日课程与灵活调整 ================= */
+/* ================= 1. 周导航与 6 列周看板渲染 ================= */
+function getMondayOfWeek(d) {
+    const date = new Date(d);
+    const day = date.getDay();
+    const diff = date.getDate() - day + (day === 0 ? -6 : 1);
+    return new Date(date.setDate(diff));
+}
+
+function changeWeek(deltaWeeks) {
+    currentBaseWeekDate.setDate(currentBaseWeekDate.getDate() + deltaWeeks * 7);
+    renderStudyHub();
+}
+
+function resetToCurrentWeek() {
+    currentBaseWeekDate = new Date();
+    selectedDateStr = getLocalDateString(new Date());
+    renderStudyHub();
+}
+
 function getOverrides() {
     let ov = localStorage.getItem("planner_class_overrides");
     return ov ? JSON.parse(ov) : { cancelled: [], replacements: [] };
@@ -239,44 +352,234 @@ function saveOverrides(ov) {
     localStorage.setItem("planner_class_overrides", JSON.stringify(ov));
 }
 
-function renderTodayClasses() {
-    const list = document.getElementById("todayClassesList");
-    list.innerHTML = "";
+function renderWeeklyBoard() {
+    const board = document.getElementById("weeklyBoard");
+    if (!board) return;
+    board.innerHTML = "";
+
+    const monday = getMondayOfWeek(currentBaseWeekDate);
     const cfg = getConfig();
     const ov = getOverrides();
+    const assigns = getStoredAssignments();
+    const actualTodayStr = getLocalDateString(new Date());
 
-    const today = new Date();
-    const dayOfWeek = String(today.getDay());
-    const todayStr = today.toISOString().split('T')[0];
+    const days = [];
+    for (let i = 0; i < 7; i++) {
+        const d = new Date(monday);
+        d.setDate(monday.getDate() + i);
+        days.push(d);
+    }
+
+    const mStr1 = days[0].toLocaleString('en-US', { month: 'short' });
+    const mStr2 = days[6].toLocaleString('en-US', { month: 'short' });
+    const rangeText = mStr1 === mStr2
+        ? `${mStr1} ${days[0].getDate()} - ${days[6].getDate()}, ${days[0].getFullYear()}`
+        : `${mStr1} ${days[0].getDate()} - ${mStr2} ${days[6].getDate()}, ${days[0].getFullYear()}`;
+
+    // 计算 Week X
+    let weekPrefix = "";
+    if (cfg.startDate) {
+        const semStartMonday = getMondayOfWeek(new Date(cfg.startDate + "T00:00:00"));
+        const currentMonday = getMondayOfWeek(monday);
+        const diffWeeks = Math.floor((currentMonday - semStartMonday) / (7 * 24 * 60 * 60 * 1000)) + 1;
+        if (diffWeeks > 0) {
+            weekPrefix = `Week ${diffWeeks}: `;
+        } else {
+            weekPrefix = "Pre-Semester: ";
+        }
+    }
+    document.getElementById("weekRangeDisplay").textContent = `${weekPrefix}${rangeText}`;
+
+    const dayLabels = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+    const getItemsHtmlForDate = (dateObj, isWeekendHalf = false) => {
+        const dStr = getLocalDateString(dateObj);
+        const dayOfWeek = String(dateObj.getDay());
+        const regulars = (cfg.weeklyTimetable || []).filter(c => c.day === dayOfWeek);
+        const replacements = (ov.replacements || []).filter(r => r.date === dStr);
+
+        let html = '<div class="day-pills-container">';
+        let hasItem = false;
+
+        // 1. 常规课胶囊
+        regulars.forEach(c => {
+            hasItem = true;
+            const isCancelled = (ov.cancelled || []).includes(`${dStr}_${c.id}`);
+            const match = cfg.courses.find(x => x.name === c.course) || { color: '#475569', bg: '#f1f5f9' };
+            const typeBadge = c.type ? `[${c.type.substring(0, 4)}]` : '';
+
+            html += `
+                <div class="mini-class-pill ${isCancelled ? 'cancelled' : ''}" 
+                     style="background-color: ${match.bg}; color: ${match.color};"
+                     title="${c.course} (${c.type || 'Lecture'}) - ${c.time}">
+                    <span style="font-size: 9px; opacity: 0.85;">${c.time}</span>
+                    <span style="font-weight: 700;">${typeBadge} ${c.course}</span>
+                </div>
+            `;
+        });
+
+        // 2. 补课胶囊
+        replacements.forEach(r => {
+            hasItem = true;
+            const match = cfg.courses.find(x => x.name === r.course) || { color: '#b45309', bg: '#fef3c7' };
+            const typeBadge = r.type ? `[${r.type.substring(0, 4)}]` : '';
+
+            html += `
+                <div class="mini-class-pill replacement" 
+                     style="background-color: ${match.bg}; color: ${match.color};"
+                     title="[Replacement] ${r.course} (${r.type || 'Lecture'}) - ${r.time}">
+                    <span style="font-size: 9px; opacity: 0.85;">⚡ ${r.time}</span>
+                    <span style="font-weight: 700;">${typeBadge} ${r.course}</span>
+                </div>
+            `;
+        });
+
+        // 3. 作业与死线胶囊
+        assigns.forEach(a => {
+            if (a.completed) return;
+            if (a.hardDate === dStr) {
+                hasItem = true;
+                html += `<div class="mini-deadline-pill mini-deadline-hard" title="Hard Due: ${a.text}">🚨 ${a.text}</div>`;
+            } else if (a.targetDate === dStr) {
+                hasItem = true;
+                html += `<div class="mini-deadline-pill mini-deadline-freeze" title="Target Freeze: ${a.text}">🎯 ${a.text}</div>`;
+            }
+        });
+
+        if (!hasItem) {
+            html += `<div class="empty-day-hint">${isWeekendHalf ? 'Off' : 'No classes'}</div>`;
+        }
+
+        html += '</div>';
+        return html;
+    };
+
+    // 渲染 Mon ~ Fri
+    for (let i = 0; i < 5; i++) {
+        const d = days[i];
+        const dStr = getLocalDateString(d);
+        const isSelected = dStr === selectedDateStr;
+        const isToday = dStr === actualTodayStr;
+
+        // 获取这一天的累计专注分钟数
+        const focusMins = getFocusMinutesByDate(dStr);
+        const focusBadgeHtml = focusMins > 0
+            ? `<span class="col-focus-badge">🔥 ${focusMins >= 60 ? Math.floor(focusMins / 60) + 'h ' + (focusMins % 60) + 'm' : focusMins + 'm'}</span>`
+            : '';
+
+        const col = document.createElement("div");
+        col.className = `week-col-day ${isSelected ? 'selected' : ''} ${isToday ? 'today-marker' : ''}`;
+        col.onclick = () => selectDay(dStr);
+
+        col.innerHTML = `
+            <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                <div>
+                    <div class="day-name">${dayLabels[i]}</div>
+                    <div class="day-number">${d.getDate()}</div>
+                </div>
+                ${focusBadgeHtml}
+            </div>
+            ${getItemsHtmlForDate(d, false)}
+        `;
+        board.appendChild(col);
+    }
+
+    // 渲染 Sat / Sun 垂直切半
+    const weekendCol = document.createElement("div");
+    weekendCol.className = "week-col-weekend";
+
+    [5, 6].forEach(idx => {
+        const d = days[idx];
+        const dStr = getLocalDateString(d);
+        const isSelected = dStr === selectedDateStr;
+        const isToday = dStr === actualTodayStr;
+
+        const focusMins = getFocusMinutesByDate(dStr);
+        const focusBadgeHtml = focusMins > 0
+            ? `<span class="col-focus-badge" style="font-size: 9px; padding: 1px 4px;">🔥 ${focusMins >= 60 ? Math.floor(focusMins / 60) + 'h ' + (focusMins % 60) + 'm' : focusMins + 'm'}</span>`
+            : '';
+
+        const subDay = document.createElement("div");
+        subDay.className = `weekend-sub-day ${isSelected ? 'selected' : ''} ${isToday ? 'today-marker' : ''}`;
+        subDay.onclick = () => selectDay(dStr);
+
+        subDay.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <span class="day-name">${dayLabels[idx]}</span>
+                <div style="display: flex; align-items: center; gap: 4px;">
+                    ${focusBadgeHtml}
+                    <span class="day-number" style="font-size:11px;">${d.getDate()}</span>
+                </div>
+            </div>
+            ${getItemsHtmlForDate(d, true)}
+        `;
+        weekendCol.appendChild(subDay);
+    });
+    board.appendChild(weekendCol);
+}
+
+function selectDay(dStr) {
+    selectedDateStr = dStr;
+    renderWeeklyBoard();
+    renderSelectedDayClasses();
+
+    const drawer = document.getElementById("dayDetailContainer");
+    if (drawer) {
+        drawer.style.display = "block";
+        drawer.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+}
+
+function closeDayDetail() {
+    const drawer = document.getElementById("dayDetailContainer");
+    if (drawer) {
+        drawer.style.display = "none";
+    }
+    selectedDateStr = null;
+    renderWeeklyBoard();
+}
+
+/* ================= 2. 选定日期的课程列表 ================= */
+function renderSelectedDayClasses() {
+    const list = document.getElementById("todayClassesList");
+    if (!list) return;
+    list.innerHTML = "";
+
+    const cfg = getConfig();
+    const ov = getOverrides();
+    const dateObj = new Date(selectedDateStr + "T00:00:00");
+    const dayOfWeek = String(dateObj.getDay());
+    const actualTodayStr = getLocalDateString(new Date());
 
     const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-    document.getElementById("todayHeading").textContent = `Today's Classes (${dayNames[today.getDay()]}, ${todayStr})`;
+    const isToday = selectedDateStr === actualTodayStr;
+
+    document.getElementById("selectedDayHeading").textContent = `${dayNames[dateObj.getDay()]}, ${selectedDateStr}${isToday ? ' (Today)' : ''}`;
 
     const regularClasses = (cfg.weeklyTimetable || []).filter(c => c.day === dayOfWeek);
-    const todaysReplacements = (ov.replacements || []).filter(r => r.date === todayStr);
+    const selectedReplacements = (ov.replacements || []).filter(r => r.date === selectedDateStr);
 
-    if (regularClasses.length === 0 && todaysReplacements.length === 0) {
-        list.innerHTML = '<div style="font-size:12px; color:#64748b; padding:8px 0;">🎉 No classes scheduled for today! Great time to clear study debts.</div>';
+    if (regularClasses.length === 0 && selectedReplacements.length === 0) {
+        list.innerHTML = `<div style="font-size:12px; color:#64748b; padding:8px 0;">🎉 No classes scheduled for this day!</div>`;
         return;
     }
 
     regularClasses.forEach(c => {
-        const isCancelled = (ov.cancelled || []).includes(`${todayStr}_${c.id}`);
+        const isCancelled = (ov.cancelled || []).includes(`${selectedDateStr}_${c.id}`);
         const card = document.createElement("div");
         card.className = `class-card ${isCancelled ? 'cancelled' : ''}`;
         const matchedCourse = cfg.courses.find(x => x.name === c.course) || { color: "#64748b", bg: "#f1f5f9" };
 
         card.innerHTML = `
             <div class="class-details">
-                <div class="class-title">${c.course} ${isCancelled ? '<span style="color:#ef4444; font-size:11px;">(Cancelled)</span>' : ''}</div>
+                <div class="class-title">${c.course} <span style="font-size:11px; color:var(--primary); font-weight:600;">[${c.type || 'Lecture'}]</span> ${isCancelled ? '<span style="color:#ef4444; font-size:11px;">(Cancelled)</span>' : ''}</div>
                 <div class="class-meta">
-                    <span class="tag-badge" style="background:${matchedCourse.bg}; color:${matchedCourse.color};">${c.time}</span>
-                    <span>📍 ${c.room || 'TBA'}</span>
+                    <span class="tag-badge" style="background:${matchedCourse.bg}; color:${matchedCourse.color}; font-weight:700;">🕒 ${c.time}</span>
                 </div>
             </div>
             <div class="class-actions">
-                ${!isCancelled ? `<button class="btn-sm" onclick="openNoteModal('${c.course}')">📝 Log Takeaway</button>` : ''}
-                <button class="btn-sm btn-cancel" onclick="toggleCancelClass('${todayStr}_${c.id}')">
+                ${!isCancelled ? `<button class="btn-sm" onclick="openNoteModal('${c.course}', '${selectedDateStr}')">📝 Log Takeaway</button>` : ''}
+                <button class="btn-sm btn-cancel" onclick="toggleCancelClass('${selectedDateStr}_${c.id}')">
                     ${isCancelled ? 'Restore' : 'Cancel'}
                 </button>
             </div>
@@ -284,21 +587,20 @@ function renderTodayClasses() {
         list.appendChild(card);
     });
 
-    todaysReplacements.forEach((r, idx) => {
+    selectedReplacements.forEach((r, idx) => {
         const card = document.createElement("div");
         card.className = "class-card replacement";
         const matchedCourse = cfg.courses.find(x => x.name === r.course) || { color: "#64748b", bg: "#f1f5f9" };
 
         card.innerHTML = `
             <div class="class-details">
-                <div class="class-title">⚡ [Replacement] ${r.course}</div>
+                <div class="class-title">⚡ [Replacement] ${r.course} <span style="font-size:11px; color:var(--primary); font-weight:600;">[${r.type || 'Lecture'}]</span></div>
                 <div class="class-meta">
-                    <span class="tag-badge" style="background:${matchedCourse.bg}; color:${matchedCourse.color};">${r.time}</span>
-                    <span>📍 ${r.room || 'TBA'}</span>
+                    <span class="tag-badge" style="background:${matchedCourse.bg}; color:${matchedCourse.color}; font-weight:700;">🕒 ${r.time}</span>
                 </div>
             </div>
             <div class="class-actions">
-                <button class="btn-sm" onclick="openNoteModal('${r.course}')">📝 Log Takeaway</button>
+                <button class="btn-sm" onclick="openNoteModal('${r.course}', '${selectedDateStr}')">📝 Log Takeaway</button>
                 <button class="btn-sm btn-cancel" onclick="deleteReplacement(${idx})">&times;</button>
             </div>
         `;
@@ -315,51 +617,75 @@ function toggleCancelClass(cancelKey) {
         ov.cancelled.push(cancelKey);
     }
     saveOverrides(ov);
-    renderTodayClasses();
+    renderStudyHub();
 }
 
 function openReplacementModal() {
-    const todayStr = new Date().toISOString().split('T')[0];
-    document.getElementById("replaceDateInput").value = todayStr;
+    document.getElementById("replaceDateInput").value = selectedDateStr || getLocalDateString(new Date());
     document.getElementById("replacementModal").style.display = "flex";
 }
+
 function closeReplacementModal() {
     document.getElementById("replacementModal").style.display = "none";
 }
+
 function saveReplacementClass() {
     const course = document.getElementById("replaceCourseSelect").value;
+    const type = document.getElementById("replaceTypeSelect").value;
     const date = document.getElementById("replaceDateInput").value;
-    const time = document.getElementById("replaceTimeInput").value.trim();
-    const room = document.getElementById("replaceRoomInput").value.trim();
+    const startTime = document.getElementById("replaceStartTimeInput").value;
+    const endTime = document.getElementById("replaceEndTimeInput").value;
 
-    if (!date || !time) {
-        alert("Please fill in date and time!");
+    if (!date || !startTime || !endTime) {
+        alert("Please select date, start time, and end time!");
         return;
     }
+
+    if (startTime >= endTime) {
+        alert("End time must be later than start time!");
+        return;
+    }
+
+    const timeRange = `${startTime} - ${endTime}`;
+
     const ov = getOverrides();
     if (!ov.replacements) ov.replacements = [];
-    ov.replacements.push({ course, date, time, room });
+    ov.replacements.push({
+        course,
+        type: type || "Lecture",
+        date,
+        time: timeRange
+    });
     saveOverrides(ov);
 
-    document.getElementById("replaceTimeInput").value = "";
-    document.getElementById("replaceRoomInput").value = "";
+    document.getElementById("replaceStartTimeInput").value = "";
+    document.getElementById("replaceEndTimeInput").value = "";
     closeReplacementModal();
-    renderTodayClasses();
+    renderStudyHub();
 }
+
 function deleteReplacement(idx) {
     const ov = getOverrides();
     ov.replacements.splice(idx, 1);
     saveOverrides(ov);
-    renderTodayClasses();
+    renderStudyHub();
 }
 
-/* ================= 2. 课堂笔记与课后债务核心联动 ================= */
+/* ================= 3. 笔记与课业负债数据隔离 ================= */
 function getLectureNotes() {
-    let notes = localStorage.getItem("planner_lecture_notes_v2");
+    let notes = localStorage.getItem("planner_lecture_notes_v3");
     return notes ? JSON.parse(notes) : [];
 }
 function saveLectureNotes(notes) {
-    localStorage.setItem("planner_lecture_notes_v2", JSON.stringify(notes));
+    localStorage.setItem("planner_lecture_notes_v3", JSON.stringify(notes));
+}
+
+function getStudyDebts() {
+    let debts = localStorage.getItem("planner_study_debts_v3");
+    return debts ? JSON.parse(debts) : [];
+}
+function saveStudyDebts(debts) {
+    localStorage.setItem("planner_study_debts_v3", JSON.stringify(debts));
 }
 
 function calculateDaysDiff(startDateStr, endDateStr) {
@@ -369,14 +695,16 @@ function calculateDaysDiff(startDateStr, endDateStr) {
     return Math.floor((end - start) / (1000 * 60 * 60 * 24));
 }
 
-function openNoteModal(courseName) {
+function openNoteModal(courseName, dateStr) {
     activeLoggingClass = courseName;
-    document.getElementById("logNoteModalTitle").textContent = `📝 Log Takeaway: ${courseName}`;
+    activeLoggingDate = dateStr || selectedDateStr;
+    document.getElementById("logNoteModalTitle").textContent = `📝 Log Takeaway: ${courseName} (${activeLoggingDate})`;
     document.getElementById("noteTopicInput").value = "";
     document.getElementById("noteContentInput").value = "";
     document.getElementById("noteCreateDebtCheckbox").checked = false;
     document.getElementById("logNoteModal").style.display = "flex";
 }
+
 function closeNoteModal() {
     document.getElementById("logNoteModal").style.display = "none";
     activeLoggingClass = null;
@@ -392,43 +720,37 @@ function saveLectureNote() {
         return;
     }
 
-    const todayStr = new Date().toISOString().split('T')[0];
+    const targetDate = activeLoggingDate || selectedDateStr;
+
+    // 1. 存入笔记知识库
     const notes = getLectureNotes();
     notes.unshift({
         id: "note_" + Date.now(),
         course: activeLoggingClass,
-        date: todayStr,
+        date: targetDate,
         topic,
-        content,
-        hasDebt: needsDebt,
-        debtResolved: false,
-        resolvedDate: null
+        content
     });
-
     saveLectureNotes(notes);
+
+    // 2. 勾选后派生到债务表
+    if (needsDebt) {
+        const debts = getStudyDebts();
+        debts.unshift({
+            id: "debt_" + Date.now(),
+            course: activeLoggingClass,
+            date: targetDate,
+            topic: `[Review] ${topic}`,
+            resolved: false,
+            resolvedDate: null
+        });
+        saveStudyDebts(debts);
+    }
+
     closeNoteModal();
     renderStudyHub();
 }
 
-function toggleDebtResolved(noteId) {
-    const notes = getLectureNotes();
-    const target = notes.find(n => n.id === noteId);
-    if (target) {
-        target.debtResolved = !target.debtResolved;
-        target.resolvedDate = target.debtResolved ? new Date().toISOString().split('T')[0] : null;
-        saveLectureNotes(notes);
-        renderStudyHub();
-    }
-}
-
-function deleteLectureNote(idx) {
-    const notes = getLectureNotes();
-    notes.splice(idx, 1);
-    saveLectureNotes(notes);
-    renderStudyHub();
-}
-
-/* 手动录入额外债务 (Manual Debt) */
 function toggleManualDebtForm() {
     const box = document.getElementById("manualDebtBox");
     box.style.display = box.style.display === "none" ? "block" : "none";
@@ -440,66 +762,86 @@ function addManualStudyDebt() {
     const date = document.getElementById("manualDebtDateInput").value;
 
     if (!text) return;
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = getLocalDateString(new Date());
 
-    const notes = getLectureNotes();
-    notes.unshift({
-        id: "note_" + Date.now(),
+    const debts = getStudyDebts();
+    debts.unshift({
+        id: "debt_" + Date.now(),
         course,
         date: date || todayStr,
         topic: text,
-        content: "Manual study debt / assignment follow-up.",
-        hasDebt: true,
-        debtResolved: false,
+        resolved: false,
         resolvedDate: null
     });
+    saveStudyDebts(debts);
 
-    saveLectureNotes(notes);
     document.getElementById("manualDebtInput").value = "";
     document.getElementById("manualDebtDateInput").value = "";
     toggleManualDebtForm();
-    renderStudyHub();
+    renderStudyDebts();
 }
 
-/* 渲染中部债务列表 (Active Debts) */
+function toggleDebtResolved(debtId) {
+    const debts = getStudyDebts();
+    const target = debts.find(d => d.id === debtId);
+    if (target) {
+        target.resolved = !target.resolved;
+        target.resolvedDate = target.resolved ? getLocalDateString(new Date()) : null;
+        saveStudyDebts(debts);
+        renderStudyDebts();
+    }
+}
+
+function deleteStudyDebt(debtId) {
+    let debts = getStudyDebts();
+    debts = debts.filter(d => d.id !== debtId);
+    saveStudyDebts(debts);
+    renderStudyDebts();
+}
+
 function renderStudyDebts() {
     const list = document.getElementById("studyDebtList");
+    const badge = document.getElementById("debtSummaryBadge");
+    if (!list) return;
     list.innerHTML = "";
-    const notes = getLectureNotes();
+    const debts = getStudyDebts();
     const cfg = getConfig();
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = getLocalDateString(new Date());
 
-    // 只筛选带有债务的条目
-    const debtItems = notes.filter(n => n.hasDebt);
+    const pendingDebts = debts.filter(d => !d.resolved);
+    if (badge) {
+        const count = pendingDebts.length;
+        badge.textContent = count === 0 ? "✨ 0 Pending" : `🚨 ${count} Pending`;
+        badge.classList.toggle("zero", count === 0);
+    }
 
-    if (debtItems.length === 0) {
+    if (debts.length === 0) {
         list.innerHTML = '<li style="color:#64748b; font-size:12px; padding:10px;">✨ No pending study debts! You are all caught up.</li>';
         return;
     }
 
-    // 智能排序：未解决的排前，且拖延时间最久的置顶
-    debtItems.sort((a, b) => {
-        if (a.debtResolved !== b.debtResolved) return a.debtResolved ? 1 : -1;
+    debts.sort((a, b) => {
+        if (a.resolved !== b.resolved) return a.resolved ? 1 : -1;
         const delayA = calculateDaysDiff(a.date, todayStr);
         const delayB = calculateDaysDiff(b.date, todayStr);
         return delayB - delayA;
     });
 
-    debtItems.forEach(item => {
+    debts.forEach(item => {
         const li = document.createElement("li");
-        const delayDays = calculateDaysDiff(item.date, item.debtResolved ? (item.resolvedDate || todayStr) : todayStr);
+        const delayDays = calculateDaysDiff(item.date, item.resolved ? (item.resolvedDate || todayStr) : todayStr);
 
-        if (!item.debtResolved && delayDays > 0) {
+        if (!item.resolved && delayDays > 0) {
             li.className = delayDays >= 4 ? "status-overdue" : "status-freeze";
         }
-        if (item.debtResolved) li.classList.add("completed");
+        if (item.resolved) li.classList.add("completed");
 
         const leftDiv = document.createElement("div");
         leftDiv.className = "task-left";
 
         const checkbox = document.createElement("input");
         checkbox.type = "checkbox";
-        checkbox.checked = item.debtResolved;
+        checkbox.checked = item.resolved;
         checkbox.onchange = () => toggleDebtResolved(item.id);
 
         const infoDiv = document.createElement("div");
@@ -507,7 +849,7 @@ function renderStudyDebts() {
 
         const title = document.createElement("div");
         title.className = "task-title";
-        title.textContent = `${item.topic}`;
+        title.textContent = item.topic;
 
         const meta = document.createElement("div");
         meta.className = "task-meta";
@@ -526,7 +868,7 @@ function renderStudyDebts() {
         meta.appendChild(dateBadge);
 
         const delayBadge = document.createElement("span");
-        if (item.debtResolved) {
+        if (item.resolved) {
             delayBadge.className = "delay-badge delay-completed";
             delayBadge.textContent = delayDays > 0 ? `✓ 迟了 ${delayDays} 天补完` : "✓ 准时补完";
         } else {
@@ -545,14 +887,38 @@ function renderStudyDebts() {
         leftDiv.appendChild(checkbox);
         leftDiv.appendChild(infoDiv);
 
+        const delBtn = document.createElement("button");
+        delBtn.className = "delete-btn";
+        delBtn.innerHTML = "&times;";
+        delBtn.onclick = () => deleteStudyDebt(item.id);
+
         li.appendChild(leftDiv);
+        li.appendChild(delBtn);
         list.appendChild(li);
     });
 }
 
-/* 渲染底部知识点归档库 (Lecture Knowledge Base) */
+function toggleAllDebtsModal() {
+    const drawer = document.getElementById("dayDetailContainer");
+    if (drawer) {
+        drawer.style.display = "block";
+        const debtSection = document.getElementById("studyDebtList");
+        if (debtSection) {
+            debtSection.scrollIntoView({ behavior: 'smooth' });
+        }
+    }
+}
+
+function deleteLectureNoteById(noteId) {
+    let notes = getLectureNotes();
+    notes = notes.filter(n => n.id !== noteId);
+    saveLectureNotes(notes);
+    renderLectureNotes();
+}
+
 function renderLectureNotes() {
     const list = document.getElementById("lectureNotesList");
+    if (!list) return;
     list.innerHTML = "";
     const notes = getLectureNotes();
     const filter = document.getElementById("notesFilterSelect").value;
@@ -563,7 +929,7 @@ function renderLectureNotes() {
         return;
     }
 
-    notes.forEach((n, idx) => {
+    notes.forEach(n => {
         if (filter !== "ALL" && n.course !== filter) return;
 
         const matchedCourse = cfg.courses.find(x => x.name === n.course) || { color: "#64748b", bg: "#f1f5f9" };
@@ -577,7 +943,7 @@ function renderLectureNotes() {
                 </div>
                 <div style="display:flex; align-items:center; gap:8px;">
                     <span style="font-size:11px; color:#64748b;">${n.date}</span>
-                    <button class="delete-btn" onclick="deleteLectureNote(${idx})">&times;</button>
+                    <button class="delete-btn" onclick="deleteLectureNoteById('${n.id}')">&times;</button>
                 </div>
             </div>
             <div class="note-body">${n.content}</div>
@@ -586,7 +952,7 @@ function renderLectureNotes() {
     });
 }
 
-/* ================= 🎯 Assignments ================= */
+/* ================= 4. 🎯 Assignments ================= */
 function getStoredAssignments() {
     let data = localStorage.getItem("planner_assign_v1");
     return data ? JSON.parse(data) : [];
@@ -594,13 +960,15 @@ function getStoredAssignments() {
 function saveAssignments(data) {
     localStorage.setItem("planner_assign_v1", JSON.stringify(data));
 }
+
 function renderAssignments() {
     const list = document.getElementById("assignmentList");
+    if (!list) return;
     list.innerHTML = "";
     const items = getStoredAssignments();
     const cfg = getConfig();
     const filter = document.getElementById("assignFilterSelect").value;
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = getLocalDateString(new Date());
 
     items.forEach((item, index) => {
         if (filter !== "ALL" && item.subject !== filter) return;
@@ -705,7 +1073,7 @@ function deleteAssignment(idx) {
     renderCalendar();
 }
 
-/* ================= 📅 日历渲染与 Google Calendar 导出 ================= */
+/* ================= 5. 📅 日历 ================= */
 function changeMonth(delta) {
     calDate.setMonth(calDate.getMonth() + delta);
     renderCalendar();
@@ -723,11 +1091,11 @@ function renderCalendar() {
 
     const firstDayIndex = new Date(year, month, 1).getDay();
     const totalDays = new Date(year, month + 1, 0).getDate();
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = getLocalDateString(new Date());
 
     const cfg = getConfig();
     const assigns = getStoredAssignments();
-    const eventMap = {}; // 空字典，用于按日期聚集事件
+    const eventMap = {};
 
     const addEvent = (dStr, text, type) => {
         if (!dStr) return;
@@ -815,12 +1183,11 @@ function exportToICS() {
     document.body.removeChild(link);
 }
 
-/* ================= 💰 记账功能 ================= */
+/* ================= 6. 💰 Expenses ================= */
 function getStoredExpenses() {
     let expenses = localStorage.getItem("planner_expenses_v1");
     return expenses ? JSON.parse(expenses) : [];
 }
-
 function saveExpenses(expenses) {
     localStorage.setItem("planner_expenses_v1", JSON.stringify(expenses));
 }
@@ -907,4 +1274,135 @@ function deleteExpense(index) {
     expenses.splice(index, 1);
     saveExpenses(expenses);
     renderExpenses();
+}
+
+/* ================= ⏱️ 专注计时器功能逻辑 ================= */
+let timerInterval = null;
+let timerMode = 'pomodoro'; // 'pomodoro' | 'shortBreak' | 'stopwatch'
+let timerSecondsLeft = 25 * 60;
+let stopwatchSeconds = 0;
+let isTimerRunning = false;
+
+function toggleTimerPanel() {
+    const card = document.getElementById("timerCard");
+    const pill = document.getElementById("timerPill");
+    const isShowing = card.style.display !== "none";
+    card.style.display = isShowing ? "none" : "flex";
+    pill.style.display = isShowing ? "flex" : "none";
+}
+
+function formatTimerTime(sec) {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+}
+
+function updateTimerDisplay() {
+    const timeText = timerMode === 'stopwatch'
+        ? formatTimerTime(stopwatchSeconds)
+        : formatTimerTime(timerSecondsLeft);
+
+    document.getElementById("timerBigDisplay").textContent = timeText;
+    document.getElementById("timerPillDisplay").textContent = timeText;
+
+    const pill = document.getElementById("timerPill");
+    if (isTimerRunning) {
+        pill.classList.add("running");
+    } else {
+        pill.classList.remove("running");
+    }
+}
+
+function setTimerMode(mode) {
+    if (isTimerRunning) toggleTimerStart(); // 切换模式时自动先暂停
+    timerMode = mode;
+
+    document.querySelectorAll('.timer-mode-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('onclick').includes(mode));
+    });
+
+    const statusLabel = document.getElementById("timerStatusLabel");
+    if (mode === 'pomodoro') {
+        timerSecondsLeft = 25 * 60;
+        statusLabel.textContent = "Focus Sprint (25m)";
+    } else if (mode === 'shortBreak') {
+        timerSecondsLeft = 5 * 60;
+        statusLabel.textContent = "Short Break (5m)";
+    } else if (mode === 'stopwatch') {
+        stopwatchSeconds = 0;
+        statusLabel.textContent = "Free Flow Focus";
+    }
+
+    updateTimerDisplay();
+}
+
+function toggleTimerStart() {
+    const btn = document.getElementById("timerToggleBtn");
+    const statusLabel = document.getElementById("timerStatusLabel");
+
+    if (isTimerRunning) {
+        // 暂停计时
+        clearInterval(timerInterval);
+        isTimerRunning = false;
+        btn.textContent = "Start";
+        btn.style.backgroundColor = "var(--primary)";
+        statusLabel.textContent = "Paused";
+    } else {
+        // 开始计时
+        isTimerRunning = true;
+        btn.textContent = "Pause";
+        btn.style.backgroundColor = "#e11d48"; // 运行中高亮提示
+        statusLabel.textContent = timerMode === 'shortBreak' ? "Resting..." : "Focusing...";
+
+        timerInterval = setInterval(() => {
+            if (timerMode === 'stopwatch') {
+                stopwatchSeconds++;
+                updateTimerDisplay();
+            } else {
+                if (timerSecondsLeft > 0) {
+                    timerSecondsLeft--;
+                    updateTimerDisplay();
+                } else {
+                    clearInterval(timerInterval);
+                    isTimerRunning = false;
+                    btn.textContent = "Start";
+                    btn.style.backgroundColor = "var(--primary)";
+                    alert("🎉 Sprint session completed!");
+                    resetTimer();
+                }
+            }
+        }, 1000);
+    }
+    updateTimerDisplay();
+}
+
+function resetTimer() {
+    if (isTimerRunning) {
+        clearInterval(timerInterval);
+        isTimerRunning = false;
+        document.getElementById("timerToggleBtn").textContent = "Start";
+        document.getElementById("timerToggleBtn").style.backgroundColor = "var(--primary)";
+    }
+
+    if (timerMode === 'pomodoro') timerSecondsLeft = 25 * 60;
+    else if (timerMode === 'shortBreak') timerSecondsLeft = 5 * 60;
+    else if (timerMode === 'stopwatch') stopwatchSeconds = 0;
+
+    document.getElementById("timerStatusLabel").textContent = "Ready to sprint";
+    updateTimerDisplay();
+}
+
+// ================= 专注时长读取与记录工具 =================
+function getFocusMinutesByDate(dateStr) {
+    const key = `planner_focus_${dateStr}`;
+    return parseInt(localStorage.getItem(key) || "0", 10);
+}
+
+function addFocusMinutes(mins, dateStr = null) {
+    if (mins <= 0) return;
+    const targetDate = dateStr || getLocalDateString(new Date());
+    const key = `planner_focus_${targetDate}`;
+    const current = getFocusMinutesByDate(targetDate);
+    localStorage.setItem(key, current + mins);
+    renderWeeklyBoard(); // 记录后刷新看版
 }
